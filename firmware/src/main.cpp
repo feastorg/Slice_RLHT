@@ -453,12 +453,6 @@ void relayControlLogic()
 
     actuateRelay(RELAY1, timing.relay1Start, (unsigned long)slice.relayHeater1.relayPeriod, (unsigned long)slice.relayHeater1.relayOnTime, slice.relay1State);
     actuateRelay(RELAY2, timing.relay2Start, (unsigned long)slice.relayHeater2.relayPeriod, (unsigned long)slice.relayHeater2.relayOnTime, slice.relay2State);
-
-    // Commit output fields atomically for reply_get_state (called from ISR).
-    noInterrupts();
-    slice.relay1State = slice.relay1State;
-    slice.relay2State = slice.relay2State;
-    interrupts();
 }
 
 void actuateRelay(uint8_t relayPin, unsigned long &relayStart, unsigned long relayPeriod, unsigned long relayOnTime, bool &relayState)
