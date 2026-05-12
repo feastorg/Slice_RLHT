@@ -45,6 +45,12 @@ static uint16_t clampRelayPeriod(uint16_t p)
     return p;
 }
 
+// Deferred relay period storage: ISR writes pending values, main loop applies.
+static volatile uint16_t pendingPeriod1 = 0;
+static volatile uint16_t pendingPeriod2 = 0;
+static volatile bool periodPending1 = false;
+static volatile bool periodPending2 = false;
+
 MAX6675 thermocouple1(TC_CLK, TC_CS1, TC_DATA);
 MAX6675 thermocouple2(TC_CLK, TC_CS2, TC_DATA);
 
@@ -107,15 +113,41 @@ void setRelayPeriod(uint8_t relayId, uint16_t periodMs)
 
     if (relayId == 1)
     {
-        slice.relayHeater1.relayPeriod = p;
-        if (slice.relayHeater1.relayOnTime > (double)p)
-            slice.relayHeater1.relayOnTime = (double)p;
-        relay1PID.SetOutputLimits(0, p);
+        pendingPeriod1 = p;
+        periodPending1 = true;
         return;
     }
 
     if (relayId == 2)
     {
+        pendingPeriod2 = p;
+        periodPending2 = true;
+    }
+}
+
+// Apply deferred relay period changes from main loop context (PID not ISR-safe).
+static void applyPendingPeriods()
+{
+    if (periodPending1)
+    {
+        noInterrupts();
+        uint16_t p = pendingPeriod1;
+        periodPending1 = false;
+        interrupts();
+
+        slice.relayHeater1.relayPeriod = p;
+        if (slice.relayHeater1.relayOnTime > (double)p)
+            slice.relayHeater1.relayOnTime = (double)p;
+        relay1PID.SetOutputLimits(0, p);
+    }
+
+    if (periodPending2)
+    {
+        noInterrupts();
+        uint16_t p = pendingPeriod2;
+        periodPending2 = false;
+        interrupts();
+
         slice.relayHeater2.relayPeriod = p;
         if (slice.relayHeater2.relayOnTime > (double)p)
             slice.relayHeater2.relayOnTime = (double)p;
@@ -225,8 +257,11 @@ void setupRLHT()
     slice.relayHeater1.thermocoupleSelect = 1;
     slice.relayHeater2.thermocoupleSelect = 2;
 
-    setRelayPeriod(1, slice.relayHeater1.relayPeriod);
-    setRelayPeriod(2, slice.relayHeater2.relayPeriod);
+    // Apply initial relay periods directly (no ISR active during setup).
+    slice.relayHeater1.relayPeriod = clampRelayPeriod(slice.relayHeater1.relayPeriod);
+    relay1PID.SetOutputLimits(0, slice.relayHeater1.relayPeriod);
+    slice.relayHeater2.relayPeriod = clampRelayPeriod(slice.relayHeater2.relayPeriod);
+    relay2PID.SetOutputLimits(0, slice.relayHeater2.relayPeriod);
 
     relay1PID.SetMode(AUTOMATIC);
     relay2PID.SetMode(AUTOMATIC);
@@ -278,23 +313,26 @@ void processEStop()
     // Internal pull-up means asserted e-stop pulls the line LOW.
     if (digitalRead(ESTOP) == LOW)
     {
+        noInterrupts();
         slice.relayHeater1.setpointTemperature = 0;
         slice.relayHeater2.setpointTemperature = 0;
         slice.relayHeater1.relayOnTime = 0;
         slice.relayHeater2.relayOnTime = 0;
-
-        digitalWrite(RELAY1, LOW);
-        digitalWrite(RELAY2, LOW);
-
         slice.relay1State = false;
         slice.relay2State = false;
         slice.eStop = true;
+        interrupts();
+
+        digitalWrite(RELAY1, LOW);
+        digitalWrite(RELAY2, LOW);
 
         SLICE_DEBUG_PRINTLN(F("ESTOP PRESSED!"));
     }
     else
     {
+        noInterrupts();
         slice.eStop = false;
+        interrupts();
         SLICE_DEBUG_PRINTLN(F("ESTOP RELEASED!"));
     }
 }
@@ -311,21 +349,57 @@ void measureThermocouples()
 
 void relayControlLogic()
 {
-    if (slice.eStop)
+    // Apply any deferred relay period changes from ISR context.
+    applyPendingPeriods();
+
+    // Snapshot ISR-written command fields atomically.
+    noInterrupts();
+    bool localEStop = slice.eStop;
+    ControlMode localMode = slice.mode;
+    double sp1 = slice.relayHeater1.setpointTemperature;
+    double sp2 = slice.relayHeater2.setpointTemperature;
+    double kp1 = slice.relayHeater1.Kp;
+    double ki1 = slice.relayHeater1.Ki;
+    double kd1 = slice.relayHeater1.Kd;
+    double kp2 = slice.relayHeater2.Kp;
+    double ki2 = slice.relayHeater2.Ki;
+    double kd2 = slice.relayHeater2.Kd;
+    uint8_t tc1 = slice.relayHeater1.thermocoupleSelect;
+    uint8_t tc2 = slice.relayHeater2.thermocoupleSelect;
+    double onTime1 = slice.relayHeater1.relayOnTime;
+    double onTime2 = slice.relayHeater2.relayOnTime;
+    interrupts();
+
+    // Apply snapshot to slice for PID (which uses pointers into slice).
+    slice.relayHeater1.setpointTemperature = sp1;
+    slice.relayHeater2.setpointTemperature = sp2;
+    slice.relayHeater1.Kp = kp1;
+    slice.relayHeater1.Ki = ki1;
+    slice.relayHeater1.Kd = kd1;
+    slice.relayHeater2.Kp = kp2;
+    slice.relayHeater2.Ki = ki2;
+    slice.relayHeater2.Kd = kd2;
+    slice.relayHeater1.thermocoupleSelect = tc1;
+    slice.relayHeater2.thermocoupleSelect = tc2;
+
+    if (localEStop)
     {
         digitalWrite(RELAY1, LOW);
         digitalWrite(RELAY2, LOW);
+        noInterrupts();
         slice.relay1State = false;
         slice.relay2State = false;
+        interrupts();
         return;
     }
 
+    slice.mode = localMode;
     apply_mode_transition_if_needed();
     apply_tunings_if_needed();
 
-    if (slice.mode == CLOSED_LOOP)
+    if (localMode == CLOSED_LOOP)
     {
-        switch (slice.relayHeater1.thermocoupleSelect)
+        switch (tc1)
         {
         case 1:
             slice.relayHeater1.inputTemperature = slice.temperature1;
@@ -342,7 +416,7 @@ void relayControlLogic()
         else
             relay1PID.Compute();
 
-        switch (slice.relayHeater2.thermocoupleSelect)
+        switch (tc2)
         {
         case 1:
             slice.relayHeater2.inputTemperature = slice.temperature1;
@@ -359,22 +433,32 @@ void relayControlLogic()
         else
             relay2PID.Compute();
     }
-    else if (slice.mode == OPEN_LOOP)
+    else if (localMode == OPEN_LOOP)
     {
-        // Mode transition already handled above.
+        // In open-loop, use the ISR-provided on-times directly.
+        slice.relayHeater1.relayOnTime = onTime1;
+        slice.relayHeater2.relayOnTime = onTime2;
     }
     else
     {
         digitalWrite(RELAY1, LOW);
         digitalWrite(RELAY2, LOW);
+        noInterrupts();
         slice.relay1State = false;
         slice.relay2State = false;
+        interrupts();
         SLICE_DEBUG_PRINTLN(F("ERROR INVALID MODE, ENTERED UNKNOWN STATE!"));
         return;
     }
 
     actuateRelay(RELAY1, timing.relay1Start, (unsigned long)slice.relayHeater1.relayPeriod, (unsigned long)slice.relayHeater1.relayOnTime, slice.relay1State);
     actuateRelay(RELAY2, timing.relay2Start, (unsigned long)slice.relayHeater2.relayPeriod, (unsigned long)slice.relayHeater2.relayOnTime, slice.relay2State);
+
+    // Commit output fields atomically for reply_get_state (called from ISR).
+    noInterrupts();
+    slice.relay1State = slice.relay1State;
+    slice.relay2State = slice.relay2State;
+    interrupts();
 }
 
 void actuateRelay(uint8_t relayPin, unsigned long &relayStart, unsigned long relayPeriod, unsigned long relayOnTime, bool &relayState)
