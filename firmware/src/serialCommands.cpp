@@ -1,39 +1,52 @@
+// src/serialCommands.cpp
 #include <Arduino.h>
-#include <avr/pgmspace.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "globals.h"
 
-static bool starts_with_p(const String &s, PGM_P prefix)
+// Static receive buffer — no heap allocation.
+static char cmdBuf[64];
+static uint8_t cmdIdx = 0;
+
+static bool starts_with_P(const char *s, PGM_P prefix)
 {
-    size_t n = strlen_P(prefix);
-    if (s.length() < (int)n)
-        return false;
-    return strncmp_P(s.c_str(), prefix, n) == 0;
+    return strncmp_P(s, prefix, strlen_P(prefix)) == 0;
 }
 
-static bool equals_p(const String &s, PGM_P token)
+static const char *after_prefix_P(const char *s, PGM_P prefix)
 {
-    return strcmp_P(s.c_str(), token) == 0;
+    return s + strlen_P(prefix);
 }
 
-void serialCommands()
+static void strupper(char *s)
 {
-    if (Serial.available() <= 0)
+    for (; *s; ++s)
+        *s = toupper((unsigned char)*s);
+}
+
+static void processCommand(char *cmd)
+{
+    // Trim leading/trailing whitespace in-place.
+    while (*cmd == ' ' || *cmd == '\t')
+        ++cmd;
+    char *end = cmd + strlen(cmd) - 1;
+    while (end > cmd && (*end == ' ' || *end == '\t' || *end == '\r'))
+        *end-- = '\0';
+
+    if (*cmd == '\0')
         return;
 
-    String command = Serial.readStringUntil('\n');
-    command.trim();
-
-    if (starts_with_p(command, PSTR("MODE=")))
+    if (starts_with_P(cmd, PSTR("MODE=")))
     {
-        String mode = command.substring(5);
-        mode.toUpperCase();
-        if (equals_p(mode, PSTR("CLOSED_LOOP")) || equals_p(mode, PSTR("0")))
+        char *mode = (char *)after_prefix_P(cmd, PSTR("MODE="));
+        strupper(mode);
+        if (strcmp_P(mode, PSTR("CLOSED_LOOP")) == 0 || strcmp_P(mode, PSTR("0")) == 0)
         {
             slice.mode = CLOSED_LOOP;
             Serial.println(F("Mode set to CLOSED_LOOP"));
         }
-        else if (equals_p(mode, PSTR("OPEN_LOOP")) || equals_p(mode, PSTR("1")))
+        else if (strcmp_P(mode, PSTR("OPEN_LOOP")) == 0 || strcmp_P(mode, PSTR("1")) == 0)
         {
             slice.mode = OPEN_LOOP;
             Serial.println(F("Mode set to OPEN_LOOP"));
@@ -43,11 +56,11 @@ void serialCommands()
             Serial.println(F("Invalid mode. Use CLOSED_LOOP/0 or OPEN_LOOP/1"));
         }
     }
-    else if (starts_with_p(command, PSTR("R1TEMP=")))
+    else if (starts_with_P(cmd, PSTR("R1TEMP=")))
     {
         if (slice.mode == CLOSED_LOOP)
         {
-            double value = command.substring(7).toFloat();
+            double value = atof(after_prefix_P(cmd, PSTR("R1TEMP=")));
             if (value >= 0 && value <= 500)
             {
                 slice.relayHeater1.setpointTemperature = value;
@@ -64,11 +77,11 @@ void serialCommands()
             Serial.println(F("R1 temp only in CLOSED_LOOP"));
         }
     }
-    else if (starts_with_p(command, PSTR("R2TEMP=")))
+    else if (starts_with_P(cmd, PSTR("R2TEMP=")))
     {
         if (slice.mode == CLOSED_LOOP)
         {
-            double value = command.substring(7).toFloat();
+            double value = atof(after_prefix_P(cmd, PSTR("R2TEMP=")));
             if (value >= 0 && value <= 500)
             {
                 slice.relayHeater2.setpointTemperature = value;
@@ -85,11 +98,11 @@ void serialCommands()
             Serial.println(F("R2 temp only in CLOSED_LOOP"));
         }
     }
-    else if (starts_with_p(command, PSTR("R1TIME=")))
+    else if (starts_with_P(cmd, PSTR("R1TIME=")))
     {
         if (slice.mode == OPEN_LOOP)
         {
-            double value = command.substring(7).toFloat();
+            double value = atof(after_prefix_P(cmd, PSTR("R1TIME=")));
             if (value >= 0 && value <= slice.relayHeater1.relayPeriod)
             {
                 slice.relayHeater1.relayOnTime = value;
@@ -109,11 +122,11 @@ void serialCommands()
             Serial.println(F("R1 time only in OPEN_LOOP"));
         }
     }
-    else if (starts_with_p(command, PSTR("R2TIME=")))
+    else if (starts_with_P(cmd, PSTR("R2TIME=")))
     {
         if (slice.mode == OPEN_LOOP)
         {
-            double value = command.substring(7).toFloat();
+            double value = atof(after_prefix_P(cmd, PSTR("R2TIME=")));
             if (value >= 0 && value <= slice.relayHeater2.relayPeriod)
             {
                 slice.relayHeater2.relayOnTime = value;
@@ -133,37 +146,37 @@ void serialCommands()
             Serial.println(F("R2 time only in OPEN_LOOP"));
         }
     }
-    else if (starts_with_p(command, PSTR("R1TC=")))
+    else if (starts_with_P(cmd, PSTR("R1TC=")))
     {
-        int value = command.substring(5).toInt();
+        long value = atol(after_prefix_P(cmd, PSTR("R1TC=")));
         if (value == 1 || value == 2)
         {
             slice.relayHeater1.thermocoupleSelect = (uint8_t)value;
             Serial.print(F("R1 TC: "));
-            Serial.println(value);
+            Serial.println((int)value);
         }
         else
         {
             Serial.println(F("TC select 1 or 2"));
         }
     }
-    else if (starts_with_p(command, PSTR("R2TC=")))
+    else if (starts_with_P(cmd, PSTR("R2TC=")))
     {
-        int value = command.substring(5).toInt();
+        long value = atol(after_prefix_P(cmd, PSTR("R2TC=")));
         if (value == 1 || value == 2)
         {
             slice.relayHeater2.thermocoupleSelect = (uint8_t)value;
             Serial.print(F("R2 TC: "));
-            Serial.println(value);
+            Serial.println((int)value);
         }
         else
         {
             Serial.println(F("TC select 1 or 2"));
         }
     }
-    else if (starts_with_p(command, PSTR("R1KP=")))
+    else if (starts_with_P(cmd, PSTR("R1KP=")))
     {
-        double value = command.substring(5).toFloat();
+        double value = atof(after_prefix_P(cmd, PSTR("R1KP=")));
         if (value >= 0)
         {
             slice.relayHeater1.Kp = value;
@@ -175,9 +188,9 @@ void serialCommands()
             Serial.println(F("Kp must be >= 0"));
         }
     }
-    else if (starts_with_p(command, PSTR("R1KI=")))
+    else if (starts_with_P(cmd, PSTR("R1KI=")))
     {
-        double value = command.substring(5).toFloat();
+        double value = atof(after_prefix_P(cmd, PSTR("R1KI=")));
         if (value >= 0)
         {
             slice.relayHeater1.Ki = value;
@@ -189,9 +202,9 @@ void serialCommands()
             Serial.println(F("Ki must be >= 0"));
         }
     }
-    else if (starts_with_p(command, PSTR("R1KD=")))
+    else if (starts_with_P(cmd, PSTR("R1KD=")))
     {
-        double value = command.substring(5).toFloat();
+        double value = atof(after_prefix_P(cmd, PSTR("R1KD=")));
         if (value >= 0)
         {
             slice.relayHeater1.Kd = value;
@@ -203,9 +216,9 @@ void serialCommands()
             Serial.println(F("Kd must be >= 0"));
         }
     }
-    else if (starts_with_p(command, PSTR("R2KP=")))
+    else if (starts_with_P(cmd, PSTR("R2KP=")))
     {
-        double value = command.substring(5).toFloat();
+        double value = atof(after_prefix_P(cmd, PSTR("R2KP=")));
         if (value >= 0)
         {
             slice.relayHeater2.Kp = value;
@@ -217,9 +230,9 @@ void serialCommands()
             Serial.println(F("Kp must be >= 0"));
         }
     }
-    else if (starts_with_p(command, PSTR("R2KI=")))
+    else if (starts_with_P(cmd, PSTR("R2KI=")))
     {
-        double value = command.substring(5).toFloat();
+        double value = atof(after_prefix_P(cmd, PSTR("R2KI=")));
         if (value >= 0)
         {
             slice.relayHeater2.Ki = value;
@@ -231,9 +244,9 @@ void serialCommands()
             Serial.println(F("Ki must be >= 0"));
         }
     }
-    else if (starts_with_p(command, PSTR("R2KD=")))
+    else if (starts_with_P(cmd, PSTR("R2KD=")))
     {
-        double value = command.substring(5).toFloat();
+        double value = atof(after_prefix_P(cmd, PSTR("R2KD=")));
         if (value >= 0)
         {
             slice.relayHeater2.Kd = value;
@@ -245,14 +258,14 @@ void serialCommands()
             Serial.println(F("Kd must be >= 0"));
         }
     }
-    else if (starts_with_p(command, PSTR("R1PERIOD=")))
+    else if (starts_with_P(cmd, PSTR("R1PERIOD=")))
     {
-        int value = command.substring(9).toInt();
+        long value = atol(after_prefix_P(cmd, PSTR("R1PERIOD=")));
         if (value >= 100 && value <= 10000)
         {
             setRelayPeriod(1, (uint16_t)value);
             Serial.print(F("R1 period: "));
-            Serial.print(slice.relayHeater1.relayPeriod);
+            Serial.print((int)value);
             Serial.println(F("ms"));
         }
         else
@@ -260,14 +273,14 @@ void serialCommands()
             Serial.println(F("Period range 100-10000ms"));
         }
     }
-    else if (starts_with_p(command, PSTR("R2PERIOD=")))
+    else if (starts_with_P(cmd, PSTR("R2PERIOD=")))
     {
-        int value = command.substring(9).toInt();
+        long value = atol(after_prefix_P(cmd, PSTR("R2PERIOD=")));
         if (value >= 100 && value <= 10000)
         {
             setRelayPeriod(2, (uint16_t)value);
             Serial.print(F("R2 period: "));
-            Serial.print(slice.relayHeater2.relayPeriod);
+            Serial.print((int)value);
             Serial.println(F("ms"));
         }
         else
@@ -275,7 +288,7 @@ void serialCommands()
             Serial.println(F("Period range 100-10000ms"));
         }
     }
-    else if (starts_with_p(command, PSTR("HELP")) || starts_with_p(command, PSTR("?")))
+    else if (starts_with_P(cmd, PSTR("HELP")) || starts_with_P(cmd, PSTR("?")))
     {
         Serial.println(F("Commands:"));
         Serial.println(F("MODE=CLOSED_LOOP/OPEN_LOOP"));
@@ -293,5 +306,24 @@ void serialCommands()
     else
     {
         Serial.println(F("Invalid cmd! Type HELP"));
+    }
+}
+
+void serialCommands()
+{
+    while (Serial.available())
+    {
+        char c = (char)Serial.read();
+        if (c == '\n')
+        {
+            cmdBuf[cmdIdx] = '\0';
+            processCommand(cmdBuf);
+            cmdIdx = 0;
+        }
+        else if (cmdIdx < sizeof(cmdBuf) - 1)
+        {
+            cmdBuf[cmdIdx++] = c;
+        }
+        // else: silently discard overflow characters until newline.
     }
 }
