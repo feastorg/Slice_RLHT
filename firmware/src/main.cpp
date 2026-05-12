@@ -7,6 +7,11 @@
 #include <crumbs_arduino.h>
 #include <bread/rlht_ops.h>
 
+// Watchdog
+#if defined(__AVR__) || defined(ARDUINO_ARCH_MEGAAVR)
+#include <avr/wdt.h>
+#endif
+
 #include "config.h"
 #include "config_hardware.h"
 #include "globals.h"
@@ -120,13 +125,16 @@ void setRelayPeriod(uint8_t relayId, uint16_t periodMs)
 
 void setup()
 {
+    wdt_disable();
     setupSlice();
     setupRLHT();
     delay(1000);
+    wdt_enable(WDTO_1S);
 }
 
 void loop()
 {
+    wdt_reset();
     pollEStop();
     measureThermocouples();
     relayControlLogic();
