@@ -42,8 +42,8 @@ struct RLHT_SLICE
 
 struct Timing
 {
-    long lastThermoRead;
-    long lastSerialPrint;
+    unsigned long lastThermoRead;
+    unsigned long lastSerialPrint;
     unsigned long relay1Start;
     unsigned long relay2Start;
 };
