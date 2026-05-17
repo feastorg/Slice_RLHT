@@ -1,9 +1,8 @@
 # Changelog
 
-All notable changes to Slice RLHT are summarized here.
+All notable changes to Slice RLHT are documented here.
 
-This changelog was reconstructed from the repository history because no release
-tags are currently present.
+This project did not use formal release tags through most of its history, so this changelog is organized by dated development eras rather than semantic-version releases.
 
 ## [Unreleased]
 
@@ -13,11 +12,11 @@ tags are currently present.
 
 ### Notes
 
-- The root README and several docs pages still contain template placeholders.
+- The root README still contains template placeholder sections.
 - No formal release tags or semantic-versioned hardware/firmware releases have
   been cut in this repository yet.
 
-## [Current State] - 2026-05-12
+## [2026-04-01 to 2026-05-12] Firmware Hardening And Dependency Cleanup
 
 ### Added
 
@@ -87,7 +86,7 @@ tags are currently present.
 - Removed remaining active hardware backup zip files from the main hardware
   tree.
 
-## [PlatformIO and Contract Cutover] - 2026-03-09 to 2026-04-01
+## [2026-03-09 to 2026-04-01] PlatformIO And Contract Cutover
 
 ### Added
 
@@ -132,7 +131,7 @@ tags are currently present.
 - Removed temporary firmware placeholder files after the active PlatformIO tree
   landed.
 
-## [Archive and Documentation Reorganization] - 2025-09-24 to 2026-02-01
+## [2025-09-24 to 2026-02-01] Archive And Documentation Reorganization
 
 ### Added
 
@@ -164,7 +163,7 @@ tags are currently present.
   established.
 - Removed an obsolete hardware reference image and archived binary backup zips.
 
-## [CRUMBS Prototype and Firmware Revision Era] - 2025-02-19 to 2025-04-19
+## [2025-02-19 to 2025-04-19] CRUMBS Prototype And Firmware Revision Era
 
 ### Added
 
@@ -191,7 +190,7 @@ tags are currently present.
 - Separated e-stop processing from the main loop.
 - Modularized relay actuation.
 
-## [Initial Hardware and Firmware Bring-Up] - 2024-05-23 to 2024-09-30
+## [2024-05-23 to 2024-09-30] Initial Hardware And Firmware Bring-Up
 
 ### Added
 
