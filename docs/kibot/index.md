@@ -14,4 +14,4 @@ The following files were generated from the latest PCB build:
 - [BREAD_Slice-bom.html](./BREAD_Slice-bom.html)
 - [BREAD_Slice-ibom.html](./BREAD_Slice-ibom.html)
 
-_Last updated automatically on 2026-04-20 at 15:20:31 UTC by KiBot via GitHub Actions._
+_Last updated automatically on 2026-05-20 at 03:49:41 UTC by KiBot via GitHub Actions._
