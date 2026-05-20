@@ -1,0 +1,208 @@
+schema_version: "1.0"
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+id: "slice-rlht"
+name: "Relay Heater Controller"
+status: "prototype"
+category: "integrated"
+
+summary: "Dual-channel relay heater controller with thermocouple feedback and PID."
+description: null
+
+# ── Versioning ────────────────────────────────────────────────────────────────
+version:
+  hardware: "0.2.0"
+  firmware: "0.1.0"
+  manifest: "0.1.0"
+
+# ── Compatibility ─────────────────────────────────────────────────────────────
+compatibility:
+  slice_spec: ">=0.1.0 <0.2.0"
+  crumbs_protocol: ">=0.12.0 <1.0.0"
+  anolis_provider_api: null
+
+# ── Hardware ──────────────────────────────────────────────────────────────────
+hardware:
+  mcu:
+    type: "dev-board-socket"
+    form_factor: "nano"
+    primary: "ATmega328P"
+    supported:
+      - "ATmega328P"
+      - "ATmega4809"
+  primary_ic:
+    manufacturer: "Maxim Integrated"
+    part_number: "MAX6675"
+  hw_gen_current: 2
+  hw_gen_supported: [1, 2]
+  pcb:
+    layers: 2
+    thickness: "1.6mm"
+    copper_weight: "1oz"
+    dimensions: "70mm x 100mm"
+  connectors:
+    - ref: "J1"
+      type: "slice-bus-10pin"
+      purpose: "power-and-i2c"
+  mounting:
+    pattern: "slice-standard-v0"
+    hole_size: "M3"
+    inset: "5mm"
+  pcb_color_prototype: "blue"
+  pcb_color_production: "green"
+  enclosure:
+    supported: true
+    path: null
+
+# ── Electrical ────────────────────────────────────────────────────────────────
+electrical:
+  input_voltage: "12V"
+  logic_voltage: "5V"
+  max_current: null
+  protection:
+    reverse_polarity: false
+    input_esd: false
+    fuse: false
+  isolation:
+    present: false
+
+# ── Interfaces ────────────────────────────────────────────────────────────────
+interfaces:
+  host:
+    type: "i2c"
+    address_default: 10
+    address_configurable: true
+  data:
+    inputs:
+      - name: "TC1"
+        type: "thermocouple-k"
+      - name: "TC2"
+        type: "thermocouple-k"
+    outputs:
+      - name: "RELAY1"
+        type: "relay-no"
+      - name: "RELAY2"
+        type: "relay-no"
+
+# ── Capabilities ──────────────────────────────────────────────────────────────
+capabilities:
+  - id: "temperature_sensing"
+    channels: 2
+    control_modes: []
+  - id: "relay_heater_control"
+    channels: 2
+    control_modes: ["on_off", "pid"]
+
+# ── Firmware ──────────────────────────────────────────────────────────────────
+firmware:
+  required: true
+  path: "firmware/"
+  language: "c++"
+  framework: "arduino"
+  targets:
+    - "gen1_nano"
+    - "gen2_nano"
+    - "gen1_nanoevery"
+    - "gen2_nanoevery"
+  lib_deps:
+    - "fastled/FastLED @ ^3.6.0"
+    - "cameronbrooks11/CRUMBS @ ^0.12.0"
+    - "cameronbrooks11/bread-crumbs-contracts @ ^0.4.1"
+    - "br3ttb/PID @ ^1.2.1"
+    - "https://github.com/adafruit/MAX6675-library.git"
+
+# ── Protocol ──────────────────────────────────────────────────────────────────
+protocol:
+  type: "crumbs-i2c"
+  discovery:
+    supported: false
+  commands: []
+
+# ── Software ──────────────────────────────────────────────────────────────────
+software:
+  drivers:
+    python: null
+    arduino: null
+  provider:
+    supported: false
+    path: null
+
+# ── Artifacts ─────────────────────────────────────────────────────────────────
+artifacts:
+  schematic: "hardware/BREAD_Slice.kicad_sch"
+  pcb: "hardware/BREAD_Slice.kicad_pcb"
+  firmware: "firmware/"
+  docs: "docs/"
+  bom: null
+  gerbers: null
+  pick_and_place: null
+  datasheets: []
+
+# ── Manufacturing ─────────────────────────────────────────────────────────────
+manufacturing:
+  assembly_type: "manual"
+  preferred_fab: null
+  dnp_parts: []
+  critical_parts: []
+  substitutions_allowed: true
+
+# ── Validation ────────────────────────────────────────────────────────────────
+validation:
+  status: "not_validated"
+  tested_revisions: []
+  tests:
+    electrical: false
+    firmware: false
+    environmental: false
+    integration: false
+  known_issues: []
+
+# ── Safety ────────────────────────────────────────────────────────────────────
+safety:
+  hazards:
+    - "high-temperature surfaces"
+  max_safe_voltage: "12V"
+  intended_environment: "lab"
+  not_for:
+    - "human safety critical systems"
+    - "unattended heating operations"
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+dependencies:
+  hardware: []
+  firmware_libraries: []
+  software_packages: []
+
+# ── Relations ─────────────────────────────────────────────────────────────────
+related:
+  supersedes: null
+  superseded_by: null
+  variants: []
+  compatible_slices: []
+
+# ── Maintainers ───────────────────────────────────────────────────────────────
+maintainers:
+  - name: "Cameron Brooks"
+    role: "owner"
+
+# ── License ───────────────────────────────────────────────────────────────────
+license:
+  hardware: "CERN-OHL-S-2.0"
+  firmware: "GPL-3.0-or-later"
+  software: "GPL-3.0-or-later"
+  docs: "CC-BY-4.0"
+
+# ── Repository ────────────────────────────────────────────────────────────────
+repository:
+  url: "https://github.com/feastorg/Slice_RLHT"
+
+# ── Metadata ──────────────────────────────────────────────────────────────────
+metadata:
+  created: "2026-05-19"
+  updated: "2026-05-19"
+  tags:
+    - "heater-control"
+    - "thermocouple"
+    - "relay"
+    - "pid"
+    - "temperature"
