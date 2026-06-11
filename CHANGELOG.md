@@ -10,6 +10,11 @@ This project did not use formal release tags through most of its history, so thi
 
 - Added this curated root changelog, distilled from the complete Git history.
 
+### Changed
+
+- Updated active firmware metadata to reference CRUMBS `0.12.4` and
+  `bread-crumbs-contracts` `0.4.3`.
+
 ### Notes
 
 - The root README still contains template placeholder sections.
