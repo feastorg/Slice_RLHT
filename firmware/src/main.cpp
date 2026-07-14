@@ -352,22 +352,33 @@ void relayControlLogic()
     // Apply any deferred relay period changes from ISR context.
     applyPendingPeriods();
 
-    // Snapshot ISR-written command fields atomically.
+    // Snapshot ISR-written command fields atomically. Keep each masked
+    // window short (<~10 us): a long cli window delays TWI ISR entry at the
+    // SLA+R boundary and the resulting clock stretch is mishandled by Linux
+    // SBC I2C masters (see feastorg/Slice_DCMT#3). Per-heater fields stay in
+    // one window so a heater's tunings are never torn; a torn view across
+    // windows self-corrects next iteration.
     noInterrupts();
     bool localEStop = slice.eStop;
     ControlMode localMode = slice.mode;
     double sp1 = slice.relayHeater1.setpointTemperature;
     double sp2 = slice.relayHeater2.setpointTemperature;
+    double onTime1 = slice.relayHeater1.relayOnTime;
+    double onTime2 = slice.relayHeater2.relayOnTime;
+    interrupts();
+
+    noInterrupts();
     double kp1 = slice.relayHeater1.Kp;
     double ki1 = slice.relayHeater1.Ki;
     double kd1 = slice.relayHeater1.Kd;
+    uint8_t tc1 = slice.relayHeater1.thermocoupleSelect;
+    interrupts();
+
+    noInterrupts();
     double kp2 = slice.relayHeater2.Kp;
     double ki2 = slice.relayHeater2.Ki;
     double kd2 = slice.relayHeater2.Kd;
-    uint8_t tc1 = slice.relayHeater1.thermocoupleSelect;
     uint8_t tc2 = slice.relayHeater2.thermocoupleSelect;
-    double onTime1 = slice.relayHeater1.relayOnTime;
-    double onTime2 = slice.relayHeater2.relayOnTime;
     interrupts();
 
     // Apply snapshot to slice for PID (which uses pointers into slice).
