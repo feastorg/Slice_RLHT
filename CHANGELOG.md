@@ -14,6 +14,12 @@ This project did not use formal release tags through most of its history, so thi
 
 - Updated active firmware metadata to reference CRUMBS `0.12.4` and
   `bread-crumbs-contracts` `0.4.3`.
+- Split the `relayControlLogic()` shared-state snapshot into three short
+  interrupt-masked windows (worst case ~18 bytes instead of ~44). Long
+  `noInterrupts()` windows delay TWI ISR entry and force a clock stretch
+  that Linux SBC I2C masters mishandle — the confirmed cause of the DCMT
+  query failures (feastorg/Slice_DCMT#3). Preventive hardening; RLHT
+  itself measured 0 failures in bench testing.
 
 ### Notes
 
