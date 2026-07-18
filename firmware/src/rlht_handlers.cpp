@@ -27,6 +27,34 @@ static double deci_c_to_temp(int16_t t)
     return ((double)t) / 10.0;
 }
 
+void handler_set_watchdog(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
+{
+    uint16_t timeout_ms = 0;
+    (void)ctx;
+    (void)opcode;
+    (void)user_data;
+
+    if (crumbs_msg_read_u16(data, data_len, 0, &timeout_ms) != 0)
+        return;
+
+    wdTimeoutMs = timeout_ms;
+    wdLastRxMs = millis();
+    wdTripped = false;
+}
+
+void reply_get_watchdog(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
+{
+    uint16_t timeout_ms = wdTimeoutMs;
+    (void)ctx;
+    (void)user_data;
+
+    (void)bread_watchdog_build_reply(reply, RLHT_TYPE_ID,
+                                     timeout_ms != 0 ? 1 : 0, timeout_ms,
+                                     wdTripped ? 1 : 0, wdTripCount);
+    // A reply build proves a live master too.
+    wdLastRxMs = millis();
+}
+
 void handler_set_mode(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
     uint8_t mode = RLHT_MODE_CLOSED_LOOP;
@@ -218,5 +246,6 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
     (void)ctx;
     (void)user_data;
 
-    (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1, RLHT_CAP_BASELINE_FLAGS);
+    (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1,
+                                 RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG);
 }
