@@ -186,6 +186,9 @@ void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_da
 {
     (void)ctx;
     (void)user_data;
+    // Every reply build proves a live master (SET_REPLY staging frames are
+    // not dispatched to on_message, so this is where poll traffic stamps).
+    wdLastRxMs = millis();
     crumbs_build_version_reply(reply, RLHT_TYPE_ID, RLHT_MODULE_VER_MAJOR, RLHT_MODULE_VER_MINOR, RLHT_MODULE_VER_PATCH);
 }
 
@@ -195,6 +198,9 @@ void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_
     uint8_t tc_pack = 0;
     uint16_t on1 = 0;
     uint16_t on2 = 0;
+
+    // The controller's periodic state poll is the primary liveness signal.
+    wdLastRxMs = millis();
     double on1d = 0.0;
     double on2d = 0.0;
     (void)ctx;
@@ -246,6 +252,7 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
     (void)ctx;
     (void)user_data;
 
+    wdLastRxMs = millis();
     (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1,
                                  RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG);
 }
