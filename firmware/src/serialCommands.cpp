@@ -39,6 +39,12 @@ static void processCommand(char *cmd)
     if (*cmd == '\0')
         return;
 
+    // A serial operator is a live master too: feed the command watchdog.
+    noInterrupts();
+    wdLastRxMs = millis();
+    wdTripped = false;
+    interrupts();
+
     if (starts_with_P(cmd, PSTR("MODE=")))
     {
         char *mode = (char *)after_prefix_P(cmd, PSTR("MODE="));
@@ -290,6 +296,27 @@ static void processCommand(char *cmd)
             Serial.println(F("Period range 100-10000ms"));
         }
     }
+    else if (starts_with_P(cmd, PSTR("WDOG=")))
+    {
+        long v = atol(after_prefix_P(cmd, PSTR("WDOG=")));
+        if (v < 0)
+            v = 0;
+        if (v > 65535)
+            v = 65535;
+        noInterrupts();
+        wdTimeoutMs = (uint16_t)v;
+        wdLastRxMs = millis();
+        wdTripped = false;
+        interrupts();
+        Serial.print(F("WDOG-> "));
+        if (v == 0)
+            Serial.println(F("disarmed"));
+        else
+        {
+            Serial.print(v);
+            Serial.println(F(" ms"));
+        }
+    }
     else if (starts_with_P(cmd, PSTR("HELP")) || starts_with_P(cmd, PSTR("?")))
     {
         Serial.println(F("Commands:"));
@@ -304,6 +331,7 @@ static void processCommand(char *cmd)
         Serial.println(F("R2KP/KI/KD=<val> - R2 PID"));
         Serial.println(F("R1PERIOD=<val> - R1 period ms"));
         Serial.println(F("R2PERIOD=<val> - R2 period ms"));
+        Serial.println(F("WDOG=<ms> - command watchdog (0=off)"));
     }
     else
     {

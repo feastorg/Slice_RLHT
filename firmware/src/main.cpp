@@ -20,6 +20,13 @@ static crumbs_context_t ctx;
 volatile bool estopTriggered = false;
 CRGB led;
 
+// Command watchdog state (see globals.h). ISR-written; main loop snapshots
+// under short masked windows.
+volatile uint16_t wdTimeoutMs = 0;
+volatile unsigned long wdLastRxMs = 0;
+volatile bool wdTripped = false;
+volatile uint8_t wdTripCount = 0;
+
 static const unsigned long ESTOP_DEBOUNCE_MS = 25;
 static bool estopDebouncePending = false;
 static unsigned long estopDebounceStartMs = 0;
@@ -168,10 +175,56 @@ void loop()
 {
     wdt_reset();
     pollEStop();
+    watchdogLogic();
     measureThermocouples();
     relayControlLogic();
     serialCommands();
     printSerialOutput();
+}
+
+// Fires for every CRC-valid inbound command frame (SET_REPLY excluded by
+// CRUMBS): any valid command proves a live master and clears a trip.
+static void on_crumbs_message(crumbs_context_t *c, const crumbs_message_t *msg)
+{
+    (void)c;
+    (void)msg;
+    wdLastRxMs = millis();
+    wdTripped = false;
+}
+
+void watchdogLogic()
+{
+    uint16_t timeout;
+    unsigned long lastRx;
+    bool tripped;
+
+    noInterrupts();
+    timeout = wdTimeoutMs;
+    lastRx = wdLastRxMs;
+    tripped = wdTripped;
+    interrupts();
+
+    if (timeout == 0 || tripped)
+        return;  // relayControlLogic holds relays LOW while tripped
+
+    if (millis() - lastRx < timeout)
+        return;
+
+    digitalWrite(RELAY1, LOW);
+    digitalWrite(RELAY2, LOW);
+
+    // Same safe-state fields as processEStop, without touching eStop.
+    noInterrupts();
+    wdTripped = true;
+    wdTripCount++;
+    slice.relayHeater1.setpointTemperature = 0;
+    slice.relayHeater2.setpointTemperature = 0;
+    slice.relayHeater1.relayOnTime = 0;
+    slice.relayHeater2.relayOnTime = 0;
+    slice.relay1State = false;
+    slice.relay2State = false;
+    interrupts();
+    SLICE_DEBUG_PRINTLN(F("WATCHDOG TRIPPED: bus silent, relays off"));
 }
 
 void setupSlice()
@@ -181,6 +234,7 @@ void setupSlice()
     Serial.begin(115200);
 
     crumbs_arduino_init_peripheral(&ctx, I2C_ADR);
+    crumbs_set_callbacks(&ctx, on_crumbs_message, nullptr, nullptr);
 
     rc = crumbs_register_handler(&ctx, RLHT_OP_SET_MODE, handler_set_mode, nullptr);
     if (rc != 0)
@@ -206,6 +260,10 @@ void setupSlice()
     if (rc != 0)
         SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register RLHT_OP_SET_OPEN_DUTY"));
 
+    rc = crumbs_register_handler(&ctx, BREAD_OP_SET_WATCHDOG, handler_set_watchdog, nullptr);
+    if (rc != 0)
+        SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register BREAD_OP_SET_WATCHDOG"));
+
     rc = crumbs_register_reply_handler(&ctx, 0x00, reply_version, nullptr);
     if (rc != 0)
         SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register version reply handler"));
@@ -217,6 +275,17 @@ void setupSlice()
     rc = crumbs_register_reply_handler(&ctx, BREAD_OP_GET_CAPS, reply_get_caps, nullptr);
     if (rc != 0)
         SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register BREAD_OP_GET_CAPS reply handler"));
+
+    rc = crumbs_register_reply_handler(&ctx, BREAD_OP_GET_WATCHDOG, reply_get_watchdog, nullptr);
+    if (rc != 0)
+        SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register BREAD_OP_GET_WATCHDOG reply handler"));
+
+#ifdef RLHT_WATCHDOG_BOOT_MS
+    // Integration opt-in: come up armed (e.g. e-stop wirings that power-cycle
+    // the board). Default builds boot disarmed.
+    wdTimeoutMs = (uint16_t)RLHT_WATCHDOG_BOOT_MS;
+    wdLastRxMs = millis();
+#endif
 
 #if RLHT_HAS_STATUS_LED
     FastLED.addLeds<NEOPIXEL, LED_PIN>(&led, 1);
@@ -359,7 +428,7 @@ void relayControlLogic()
     // one window so a heater's tunings are never torn; a torn view across
     // windows self-corrects next iteration.
     noInterrupts();
-    bool localEStop = slice.eStop;
+    bool localEStop = slice.eStop || wdTripped;
     ControlMode localMode = slice.mode;
     double sp1 = slice.relayHeater1.setpointTemperature;
     double sp2 = slice.relayHeater2.setpointTemperature;
@@ -393,6 +462,8 @@ void relayControlLogic()
     slice.relayHeater1.thermocoupleSelect = tc1;
     slice.relayHeater2.thermocoupleSelect = tc2;
 
+    // A tripped command watchdog holds the same safe state as e-stop until
+    // fresh traffic clears the trip (ISR side).
     if (localEStop)
     {
         digitalWrite(RELAY1, LOW);
