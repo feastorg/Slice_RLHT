@@ -114,6 +114,29 @@ static void apply_tunings_if_needed()
     pidTuningsApplied = true;
 }
 
+// A heater with no setpoint is off: its output is held at 0 with its PID in
+// manual. PID_v1 re-initialises the integral from the output when it goes
+// back to automatic, so a heater starts from 0 when a setpoint returns,
+// instead of resuming the duty it had built up (feastorg/Slice_RLHT#13).
+static void computeHeater(PID &pid, RelayHeater &heater)
+{
+    if (heater.setpointTemperature <= 0)
+    {
+        pid.SetMode(MANUAL);
+        heater.relayOnTime = 0;
+        return;
+    }
+    if (isnan(heater.inputTemperature))
+    {
+        // Before AUTOMATIC: a re-initialisation from a NaN input would make
+        // the next Compute() NaN.
+        heater.relayOnTime = 0;
+        return;
+    }
+    pid.SetMode(AUTOMATIC);
+    pid.Compute();
+}
+
 void setRelayPeriod(uint8_t relayId, uint16_t periodMs)
 {
     uint16_t p = clampRelayPeriod(periodMs);
@@ -224,6 +247,10 @@ void watchdogLogic()
     slice.relay1State = false;
     slice.relay2State = false;
     interrupts();
+    // A command that clears the trip may bring a setpoint before the loop
+    // ever sees this one at 0: drop the integral now.
+    relay1PID.SetMode(MANUAL);
+    relay2PID.SetMode(MANUAL);
     SLICE_DEBUG_PRINTLN(F("WATCHDOG TRIPPED: bus silent, relays off"));
 }
 
@@ -394,6 +421,10 @@ void processEStop()
 
         digitalWrite(RELAY1, LOW);
         digitalWrite(RELAY2, LOW);
+        // As for a watchdog trip: a setpoint may arrive before the loop sees
+        // this one at 0.
+        relay1PID.SetMode(MANUAL);
+        relay2PID.SetMode(MANUAL);
 
         SLICE_DEBUG_PRINTLN(F("ESTOP PRESSED!"));
     }
@@ -493,10 +524,7 @@ void relayControlLogic()
             break;
         }
 
-        if (isnan(slice.relayHeater1.inputTemperature))
-            slice.relayHeater1.relayOnTime = 0;
-        else
-            relay1PID.Compute();
+        computeHeater(relay1PID, slice.relayHeater1);
 
         switch (tc2)
         {
@@ -510,10 +538,7 @@ void relayControlLogic()
             break;
         }
 
-        if (isnan(slice.relayHeater2.inputTemperature))
-            slice.relayHeater2.relayOnTime = 0;
-        else
-            relay2PID.Compute();
+        computeHeater(relay2PID, slice.relayHeater2);
     }
     else if (localMode == OPEN_LOOP)
     {
