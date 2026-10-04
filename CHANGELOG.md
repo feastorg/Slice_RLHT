@@ -21,6 +21,18 @@ This project did not use formal release tags through most of its history, so thi
   query failures (feastorg/Slice_DCMT#3). Preventive hardening; RLHT
   itself measured 0 failures in bench testing.
 
+### Fixed
+
+- The PID integral survived `SET_SETPOINTS(0, 0)`, a command-watchdog trip
+  and an e-stop. A heater kept running after the safe state, and resumed its
+  old duty when a trip cleared or an e-stop was released, decaying only
+  through Ki, over tens of seconds, and never with Ki = 0. In closed loop, a
+  heater with a setpoint of 0 or less is now held off with its PID in
+  manual, and a trip or an e-stop puts both PIDs in manual at once, so
+  heating starts from 0 when a setpoint returns (#13). A setpoint of 0 now
+  means off, where it was a 0 °C target that only sub-zero surroundings
+  could heat to.
+
 ### Notes
 
 - The root README still contains template placeholder sections.
