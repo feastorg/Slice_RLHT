@@ -32,6 +32,12 @@ This project did not use formal release tags through most of its history, so thi
   heating starts from 0 when a setpoint returns (#13). A setpoint of 0 now
   means off, where it was a 0 °C target that only sub-zero surroundings
   could heat to.
+- Gen1 boards have one relay, on D6, with D7 not connected, but the gen1
+  firmware ran a second heater channel on D7 and reported it in `GET_STATE`
+  as if it were heating. Gen1 builds now define no `RELAY2`, never drive D7,
+  and report channel 2 as off with a 0 on-time; channel-2 commands are still
+  accepted (#21). `docs/hardware-revisions.md` records each generation's
+  boards and pin map.
 
 ### Notes
 

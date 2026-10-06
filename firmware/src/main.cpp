@@ -52,6 +52,14 @@ static uint16_t clampRelayPeriod(uint16_t p)
     return p;
 }
 
+static void relaysLow()
+{
+    digitalWrite(RELAY1, LOW);
+#if (RLHT_RELAY_COUNT >= 2)
+    digitalWrite(RELAY2, LOW);
+#endif
+}
+
 // Deferred relay period storage: ISR writes pending values, main loop applies.
 static volatile uint16_t pendingPeriod1 = 0;
 static volatile uint16_t pendingPeriod2 = 0;
@@ -233,8 +241,7 @@ void watchdogLogic()
     if (millis() - lastRx < timeout)
         return;
 
-    digitalWrite(RELAY1, LOW);
-    digitalWrite(RELAY2, LOW);
+    relaysLow();
 
     // Same safe-state fields as processEStop, without touching eStop.
     noInterrupts();
@@ -343,10 +350,11 @@ void setupSlice()
 void setupRLHT()
 {
     pinMode(RELAY1, OUTPUT);
+#if (RLHT_RELAY_COUNT >= 2)
     pinMode(RELAY2, OUTPUT);
+#endif
 
-    digitalWrite(RELAY1, LOW);
-    digitalWrite(RELAY2, LOW);
+    relaysLow();
 
     // Deterministic default mapping: Relay1->TC1, Relay2->TC2.
     // Controllers may override this later via RLHT_OP_SET_TC_SELECT.
@@ -419,8 +427,7 @@ void processEStop()
         slice.eStop = true;
         interrupts();
 
-        digitalWrite(RELAY1, LOW);
-        digitalWrite(RELAY2, LOW);
+        relaysLow();
         // As for a watchdog trip: a setpoint may arrive before the loop sees
         // this one at 0.
         relay1PID.SetMode(MANUAL);
@@ -497,8 +504,7 @@ void relayControlLogic()
     // fresh traffic clears the trip (ISR side).
     if (localEStop)
     {
-        digitalWrite(RELAY1, LOW);
-        digitalWrite(RELAY2, LOW);
+        relaysLow();
         noInterrupts();
         slice.relay1State = false;
         slice.relay2State = false;
@@ -526,6 +532,7 @@ void relayControlLogic()
 
         computeHeater(relay1PID, slice.relayHeater1);
 
+#if (RLHT_RELAY_COUNT >= 2)
         switch (tc2)
         {
         case 1:
@@ -539,6 +546,7 @@ void relayControlLogic()
         }
 
         computeHeater(relay2PID, slice.relayHeater2);
+#endif
     }
     else if (localMode == OPEN_LOOP)
     {
@@ -548,8 +556,7 @@ void relayControlLogic()
     }
     else
     {
-        digitalWrite(RELAY1, LOW);
-        digitalWrite(RELAY2, LOW);
+        relaysLow();
         noInterrupts();
         slice.relay1State = false;
         slice.relay2State = false;
@@ -559,7 +566,9 @@ void relayControlLogic()
     }
 
     actuateRelay(RELAY1, timing.relay1Start, (unsigned long)slice.relayHeater1.relayPeriod, (unsigned long)slice.relayHeater1.relayOnTime, slice.relay1State);
+#if (RLHT_RELAY_COUNT >= 2)
     actuateRelay(RELAY2, timing.relay2Start, (unsigned long)slice.relayHeater2.relayPeriod, (unsigned long)slice.relayHeater2.relayOnTime, slice.relay2State);
+#endif
 }
 
 void actuateRelay(uint8_t relayPin, unsigned long &relayStart, unsigned long relayPeriod, unsigned long relayOnTime, bool &relayState)
