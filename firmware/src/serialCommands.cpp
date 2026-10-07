@@ -56,7 +56,15 @@ static void processCommand(char *cmd)
         }
         else if (strcmp_P(mode, PSTR("OPEN_LOOP")) == 0 || strcmp_P(mode, PSTR("1")) == 0)
         {
+            // As handler_set_mode: entering open loop starts from 0.
+            noInterrupts();
+            if (slice.mode != OPEN_LOOP)
+            {
+                slice.relayHeater1.relayOnTime = 0;
+                slice.relayHeater2.relayOnTime = 0;
+            }
             slice.mode = OPEN_LOOP;
+            interrupts();
             Serial.println(F("Mode set to OPEN_LOOP"));
         }
         else

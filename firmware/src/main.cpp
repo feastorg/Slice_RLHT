@@ -89,17 +89,14 @@ static void apply_mode_transition_if_needed(ControlMode mode)
     if (mode == appliedMode)
         return;
 
-    // PID_v1 calls Initialize() on MANUAL->AUTOMATIC transitions.
-    // Apply mode only on transitions to avoid repeated integral re-seeding.
     if (mode == CLOSED_LOOP)
     {
         // Start from 0, not from the open-loop duty or an earlier PID output:
-        // Initialize() seeds the integral from the output
+        // computeHeater() switches each PID to automatic with a fresh input,
+        // and Initialize() seeds the integral from this output
         // (feastorg/Slice_RLHT#17).
         pidOutput1 = 0;
         pidOutput2 = 0;
-        relay1PID.SetMode(AUTOMATIC);
-        relay2PID.SetMode(AUTOMATIC);
         appliedMode = CLOSED_LOOP;
         return;
     }
@@ -390,8 +387,6 @@ void setupRLHT()
     slice.relayHeater2.relayPeriod = clampRelayPeriod(slice.relayHeater2.relayPeriod);
     relay2PID.SetOutputLimits(0, slice.relayHeater2.relayPeriod);
 
-    relay1PID.SetMode(AUTOMATIC);
-    relay2PID.SetMode(AUTOMATIC);
     appliedMode = CLOSED_LOOP;
     apply_tunings_if_needed(slice.relayHeater1.Kp, slice.relayHeater1.Ki, slice.relayHeater1.Kd,
                             slice.relayHeater2.Kp, slice.relayHeater2.Ki, slice.relayHeater2.Kd);

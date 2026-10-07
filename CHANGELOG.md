@@ -49,7 +49,13 @@ This project did not use formal release tags through most of its history, so thi
   still closed loop (#14).
 - Entering closed loop seeded the PID from the open-loop on-time, so a
   heater resumed the open-loop duty and, with Ki = 0, stayed there. Closed
-  loop now starts from 0 (#17).
+  loop now starts from 0, and the PID switches to automatic only with a
+  fresh input, so a non-zero Kd no longer adds a one-sample kick from the
+  last closed-loop reading (#17).
+- Entering open loop kept the PID's last on-time as the open-loop duty: the
+  heater kept running with no setpoint to stop it, and `SET_SETPOINTS(0, 0)`
+  did nothing in open loop. `SET_MODE` and serial `MODE=` now start open
+  loop at 0; re-sending open loop while already in it keeps the duty.
 
 ### Notes
 
