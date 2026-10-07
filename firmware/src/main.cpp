@@ -601,6 +601,9 @@ void relayControlLogic()
 #if (RLHT_RELAY_COUNT >= 2)
     actuateRelay(RELAY2, timing.relay2Start, (unsigned long)slice.relayHeater2.relayPeriod, (unsigned long)drive2, slice.relay2State);
 #else
+    // Gen1 has no second heater: its snapshot fields go unused.
+    (void)sp2;
+    (void)tc2;
     (void)drive2;
 #endif
 }
