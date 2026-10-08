@@ -7,6 +7,7 @@
 #include <bread/rlht_ops.h>
 
 #include "config.h"
+#include "config_hardware.h"
 #include "globals.h"
 
 static int16_t temp_to_deci_c(double t)
@@ -214,7 +215,10 @@ void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_
         flags |= RLHT_FLAG_RELAY2_ON;
 
     on1d = slice.relayHeater1.relayOnTime;
+#if (RLHT_RELAY_COUNT >= 2)
+    // Gen1 accepts channel-2 commands but has no relay to run them.
     on2d = slice.relayHeater2.relayOnTime;
+#endif
 
     // Defensive clamp for reply serialization only. Runtime invariants should
     // keep values in-range via PID output limits and command validation.

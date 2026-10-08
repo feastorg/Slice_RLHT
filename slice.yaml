@@ -33,6 +33,8 @@ hardware:
   primary_ic:
     manufacturer: "Maxim Integrated"
     part_number: "MAX6675"
+  # See docs/hardware-revisions.md. Gen1 has one relay (RELAY1 on D6; D7 is
+  # not connected). The MAX31855K board in hardware/ has no firmware profile.
   hw_gen_current: 2
   hw_gen_supported: [1, 2]
   pcb:
