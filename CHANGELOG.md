@@ -20,6 +20,17 @@ This project did not use formal release tags through most of its history, so thi
   that Linux SBC I2C masters mishandle — the confirmed cause of the DCMT
   query failures (feastorg/Slice_DCMT#3). Preventive hardening; RLHT
   itself measured 0 failures in bench testing.
+- The CRUMBS handlers unpack every SET payload with the generated
+  `rlht_*_unpack()` from `bread-crumbs-contracts` and pack the GET_STATE
+  reply with `rlht_state_pack()`, instead of reading and writing
+  hand-written offsets (#11). The layouts now live in one place, shared
+  with the controller side. Handler behaviour and the bytes on the wire
+  are unchanged; the version reply's CRUMBS version field reports 1400
+  instead of 1205, as for any CRUMBS 0.14 build.
+- Requires CRUMBS `^0.14.0` and `bread-crumbs-contracts` `^0.6.0`
+  (`firmware/platformio.ini`). Contracts 0.6.0 is not on the PlatformIO
+  registry yet, so the firmware build fails to resolve its dependencies
+  until it is published.
 
 ### Fixed
 

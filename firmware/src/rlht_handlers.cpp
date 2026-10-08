@@ -58,125 +58,101 @@ void reply_get_watchdog(crumbs_context_t *ctx, crumbs_message_t *reply, void *us
 
 void handler_set_mode(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
-    uint8_t mode = RLHT_MODE_CLOSED_LOOP;
+    rlht_set_mode_t v;
     (void)ctx;
     (void)opcode;
     (void)user_data;
 
-    if (crumbs_msg_read_u8(data, data_len, 0, &mode) != 0)
+    if (rlht_set_mode_unpack(data, data_len, &v) != 0)
         return;
 
-    if (mode != RLHT_MODE_CLOSED_LOOP && mode != RLHT_MODE_OPEN_LOOP)
+    if (v.mode != RLHT_MODE_CLOSED_LOOP && v.mode != RLHT_MODE_OPEN_LOOP)
         return;
 
     // Entering open loop starts from 0, not from the PID's last on-time,
     // which open loop would otherwise keep driving with no setpoint to stop it.
-    if (mode == RLHT_MODE_OPEN_LOOP && slice.mode != OPEN_LOOP)
+    if (v.mode == RLHT_MODE_OPEN_LOOP && slice.mode != OPEN_LOOP)
     {
         slice.relayHeater1.relayOnTime = 0;
         slice.relayHeater2.relayOnTime = 0;
     }
-    slice.mode = static_cast<ControlMode>(mode);
+    slice.mode = static_cast<ControlMode>(v.mode);
 }
 
 void handler_set_setpoints(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
-    int16_t sp1_deci = 0;
-    int16_t sp2_deci = 0;
+    rlht_set_setpoints_t v;
     (void)ctx;
     (void)opcode;
     (void)user_data;
 
-    if (crumbs_msg_read_i16(data, data_len, 0, &sp1_deci) != 0)
-        return;
-    if (crumbs_msg_read_i16(data, data_len, 2, &sp2_deci) != 0)
+    if (rlht_set_setpoints_unpack(data, data_len, &v) != 0)
         return;
 
-    slice.relayHeater1.setpointTemperature = deci_c_to_temp(sp1_deci);
-    slice.relayHeater2.setpointTemperature = deci_c_to_temp(sp2_deci);
+    slice.relayHeater1.setpointTemperature = deci_c_to_temp(v.sp1_deci_c);
+    slice.relayHeater2.setpointTemperature = deci_c_to_temp(v.sp2_deci_c);
 }
 
 void handler_set_pid(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
-    uint8_t kp1_x10 = 0;
-    uint8_t ki1_x10 = 0;
-    uint8_t kd1_x10 = 0;
-    uint8_t kp2_x10 = 0;
-    uint8_t ki2_x10 = 0;
-    uint8_t kd2_x10 = 0;
+    rlht_set_pid_t v;
     (void)ctx;
     (void)opcode;
     (void)user_data;
 
-    if (crumbs_msg_read_u8(data, data_len, 0, &kp1_x10) != 0)
-        return;
-    if (crumbs_msg_read_u8(data, data_len, 1, &ki1_x10) != 0)
-        return;
-    if (crumbs_msg_read_u8(data, data_len, 2, &kd1_x10) != 0)
-        return;
-    if (crumbs_msg_read_u8(data, data_len, 3, &kp2_x10) != 0)
-        return;
-    if (crumbs_msg_read_u8(data, data_len, 4, &ki2_x10) != 0)
-        return;
-    if (crumbs_msg_read_u8(data, data_len, 5, &kd2_x10) != 0)
+    if (rlht_set_pid_unpack(data, data_len, &v) != 0)
         return;
 
-    slice.relayHeater1.Kp = ((double)kp1_x10) / 10.0;
-    slice.relayHeater1.Ki = ((double)ki1_x10) / 10.0;
-    slice.relayHeater1.Kd = ((double)kd1_x10) / 10.0;
-    slice.relayHeater2.Kp = ((double)kp2_x10) / 10.0;
-    slice.relayHeater2.Ki = ((double)ki2_x10) / 10.0;
-    slice.relayHeater2.Kd = ((double)kd2_x10) / 10.0;
+    slice.relayHeater1.Kp = ((double)v.kp1_x10) / 10.0;
+    slice.relayHeater1.Ki = ((double)v.ki1_x10) / 10.0;
+    slice.relayHeater1.Kd = ((double)v.kd1_x10) / 10.0;
+    slice.relayHeater2.Kp = ((double)v.kp2_x10) / 10.0;
+    slice.relayHeater2.Ki = ((double)v.ki2_x10) / 10.0;
+    slice.relayHeater2.Kd = ((double)v.kd2_x10) / 10.0;
 }
 
 void handler_set_periods(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
-    uint16_t p1 = 1000;
-    uint16_t p2 = 1000;
+    rlht_set_periods_t v;
     (void)ctx;
     (void)opcode;
     (void)user_data;
 
-    if (crumbs_msg_read_u16(data, data_len, 0, &p1) != 0)
-        return;
-    if (crumbs_msg_read_u16(data, data_len, 2, &p2) != 0)
+    if (rlht_set_periods_unpack(data, data_len, &v) != 0)
         return;
 
-    setRelayPeriod(1, p1);
-    setRelayPeriod(2, p2);
+    setRelayPeriod(1, v.p1_ms);
+    setRelayPeriod(2, v.p2_ms);
 }
 
 void handler_set_tc_select(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
-    uint8_t tc1 = 0;
-    uint8_t tc2 = 0;
+    rlht_set_tc_select_t v;
     (void)ctx;
     (void)opcode;
     (void)user_data;
 
-    if (crumbs_msg_read_u8(data, data_len, 0, &tc1) != 0)
-        return;
-    if (crumbs_msg_read_u8(data, data_len, 1, &tc2) != 0)
+    if (rlht_set_tc_select_unpack(data, data_len, &v) != 0)
         return;
 
-    if (tc1 == 1 || tc1 == 2)
-        slice.relayHeater1.thermocoupleSelect = tc1;
-    if (tc2 == 1 || tc2 == 2)
-        slice.relayHeater2.thermocoupleSelect = tc2;
+    if (v.tc1 == 1 || v.tc1 == 2)
+        slice.relayHeater1.thermocoupleSelect = v.tc1;
+    if (v.tc2 == 1 || v.tc2 == 2)
+        slice.relayHeater2.thermocoupleSelect = v.tc2;
 }
 
 void handler_set_open_duty(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
-    uint8_t d1 = 0;
-    uint8_t d2 = 0;
+    rlht_set_open_duty_t v;
     (void)ctx;
     (void)opcode;
     (void)user_data;
 
-    if (crumbs_msg_read_u8(data, data_len, 0, &d1) != 0)
+    if (rlht_set_open_duty_unpack(data, data_len, &v) != 0)
         return;
-    if (crumbs_msg_read_u8(data, data_len, 1, &d2) != 0)
-        return;
+
+    uint8_t d1 = v.duty1_pct;
+    uint8_t d2 = v.duty2_pct;
 
     if (slice.mode != OPEN_LOOP)
         return;
@@ -202,6 +178,7 @@ void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_da
 
 void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
 {
+    rlht_state_t s;
     uint8_t flags = 0;
     uint8_t tc_pack = 0;
     uint16_t on1 = 0;
@@ -244,18 +221,20 @@ void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_
     tc_pack = (slice.relayHeater1.thermocoupleSelect & 0x03);
     tc_pack |= (uint8_t)((slice.relayHeater2.thermocoupleSelect & 0x03) << 2);
 
+    s.mode = (uint8_t)slice.mode;
+    s.flags = flags;
+    s.t1_deci_c = temp_to_deci_c(slice.temperature1);
+    s.t2_deci_c = temp_to_deci_c(slice.temperature2);
+    s.sp1_deci_c = temp_to_deci_c(slice.relayHeater1.setpointTemperature);
+    s.sp2_deci_c = temp_to_deci_c(slice.relayHeater2.setpointTemperature);
+    s.on1_ms = on1;
+    s.on2_ms = on2;
+    s.period1_ms = (uint16_t)slice.relayHeater1.relayPeriod;
+    s.period2_ms = (uint16_t)slice.relayHeater2.relayPeriod;
+    s.tc_select = tc_pack;
+
     crumbs_msg_init(reply, RLHT_TYPE_ID, RLHT_OP_GET_STATE);
-    crumbs_msg_add_u8(reply, (uint8_t)slice.mode);
-    crumbs_msg_add_u8(reply, flags);
-    crumbs_msg_add_i16(reply, temp_to_deci_c(slice.temperature1));
-    crumbs_msg_add_i16(reply, temp_to_deci_c(slice.temperature2));
-    crumbs_msg_add_i16(reply, temp_to_deci_c(slice.relayHeater1.setpointTemperature));
-    crumbs_msg_add_i16(reply, temp_to_deci_c(slice.relayHeater2.setpointTemperature));
-    crumbs_msg_add_u16(reply, on1);
-    crumbs_msg_add_u16(reply, on2);
-    crumbs_msg_add_u16(reply, (uint16_t)slice.relayHeater1.relayPeriod);
-    crumbs_msg_add_u16(reply, (uint16_t)slice.relayHeater2.relayPeriod);
-    crumbs_msg_add_u8(reply, tc_pack);
+    (void)rlht_state_pack(reply, &s);
 }
 
 void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
