@@ -25,6 +25,17 @@ static void strupper(char *s)
         *s = toupper((unsigned char)*s);
 }
 
+// Mode, setpoint and on-time commands are ignored while the watchdog is
+// tripped, as their CRUMBS counterparts are: nothing sent during a trip is
+// stored and acted on when it is cleared.
+static bool refuse_while_tripped()
+{
+    if (!wdTripped)
+        return false;
+    Serial.println(F("Ignored: watchdog tripped, send WDCLEAR first"));
+    return true;
+}
+
 static void processCommand(char *cmd)
 {
     // Trim leading/trailing whitespace in-place.
@@ -40,13 +51,16 @@ static void processCommand(char *cmd)
         return;
 
     // A serial operator is a live master too: feed the command watchdog.
+    // Only WDCLEAR clears a trip; any other line, a logger's included,
+    // leaves the hold latched.
     noInterrupts();
     wdLastRxMs = millis();
-    wdTripped = false;
     interrupts();
 
     if (starts_with_P(cmd, PSTR("MODE=")))
     {
+        if (refuse_while_tripped())
+            return;
         char *mode = (char *)after_prefix_P(cmd, PSTR("MODE="));
         strupper(mode);
         if (strcmp_P(mode, PSTR("CLOSED_LOOP")) == 0 || strcmp_P(mode, PSTR("0")) == 0)
@@ -74,6 +88,8 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R1TEMP=")))
     {
+        if (refuse_while_tripped())
+            return;
         if (slice.mode == CLOSED_LOOP)
         {
             double value = atof(after_prefix_P(cmd, PSTR("R1TEMP=")));
@@ -95,6 +111,8 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R2TEMP=")))
     {
+        if (refuse_while_tripped())
+            return;
         if (slice.mode == CLOSED_LOOP)
         {
             double value = atof(after_prefix_P(cmd, PSTR("R2TEMP=")));
@@ -116,6 +134,8 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R1TIME=")))
     {
+        if (refuse_while_tripped())
+            return;
         if (slice.mode == OPEN_LOOP)
         {
             double value = atof(after_prefix_P(cmd, PSTR("R1TIME=")));
@@ -140,6 +160,8 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R2TIME=")))
     {
+        if (refuse_while_tripped())
+            return;
         if (slice.mode == OPEN_LOOP)
         {
             double value = atof(after_prefix_P(cmd, PSTR("R2TIME=")));
@@ -311,10 +333,10 @@ static void processCommand(char *cmd)
             v = 0;
         if (v > 65535)
             v = 65535;
+        // Re-arms without clearing a trip, as SET_WATCHDOG does.
         noInterrupts();
         wdTimeoutMs = (uint16_t)v;
         wdLastRxMs = millis();
-        wdTripped = false;
         interrupts();
         Serial.print(F("WDOG-> "));
         if (v == 0)
@@ -324,6 +346,16 @@ static void processCommand(char *cmd)
             Serial.print(v);
             Serial.println(F(" ms"));
         }
+    }
+    else if (strcmp_P(cmd, PSTR("WDCLEAR")) == 0)
+    {
+        // The local operator's clear, as CLEAR_WATCHDOG_TRIP: the trip and
+        // nothing else. Mode, setpoint and on-time commands were ignored
+        // during the trip, so nothing heats until new ones are sent.
+        noInterrupts();
+        wdTripped = false;
+        interrupts();
+        Serial.println(F("WDOG trip cleared"));
     }
     else if (starts_with_P(cmd, PSTR("HELP")) || starts_with_P(cmd, PSTR("?")))
     {
@@ -340,6 +372,7 @@ static void processCommand(char *cmd)
         Serial.println(F("R1PERIOD=<val> - R1 period ms"));
         Serial.println(F("R2PERIOD=<val> - R2 period ms"));
         Serial.println(F("WDOG=<ms> - command watchdog (0=off)"));
+        Serial.println(F("WDCLEAR - clear a watchdog trip"));
     }
     else
     {

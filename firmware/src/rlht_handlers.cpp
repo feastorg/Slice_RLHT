@@ -38,8 +38,33 @@ void handler_set_watchdog(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *
     if (crumbs_msg_read_u16(data, data_len, 0, &timeout_ms) != 0)
         return;
 
+    // Arms, re-arms or disarms (0) and stamps liveness. It does not clear a
+    // latched trip: re-arming is safe to send while tripped, and releasing
+    // the hold is a separate, explicit act (handler_clear_watchdog_trip).
     wdTimeoutMs = timeout_ms;
     wdLastRxMs = millis();
+}
+
+void handler_clear_watchdog_trip(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
+{
+    (void)ctx;
+    (void)opcode;
+    (void)data;
+    (void)user_data;
+
+    // The payload is empty. A frame that carries one is rejected and the
+    // trip stays set, so a later payload form is never taken for a plain
+    // clear.
+    if (data_len != BREAD_WATCHDOG_CLEAR_TRIP_PAYLOAD_LEN)
+        return;
+
+    // BREAD_OP_CLEAR_WATCHDOG_TRIP: an operator's acknowledgement that
+    // releasing the hold is safe. Clears the trip and nothing else: the
+    // timeout, armed state and trip count are left as they are (liveness is
+    // stamped by on_crumbs_message, as for any valid frame). It resumes
+    // nothing: SET_MODE, SET_SETPOINTS and SET_OPEN_DUTY were ignored during
+    // the trip, so the setpoints and on-times it zeroed are still 0, and
+    // nothing heats until a new setpoint or duty arrives.
     wdTripped = false;
 }
 
@@ -63,6 +88,14 @@ void handler_set_mode(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data
     (void)opcode;
     (void)user_data;
 
+    // Ignored while the watchdog is tripped, so nothing sent during a trip
+    // is stored and acted on when the trip is cleared. The trip sets
+    // wdTripped in the same masked window that zeroes the setpoints and
+    // on-times, so a frame either lands before it (a mode it set is kept,
+    // its setpoints and duties are then zeroed) or sees it and is dropped.
+    if (wdTripped)
+        return;
+
     if (rlht_set_mode_unpack(data, data_len, &v) != 0)
         return;
 
@@ -85,6 +118,14 @@ void handler_set_setpoints(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
     (void)ctx;
     (void)opcode;
     (void)user_data;
+
+    // Ignored while the watchdog is tripped, so nothing sent during a trip
+    // is stored and acted on when the trip is cleared. The trip sets
+    // wdTripped in the same masked window that zeroes the setpoints and
+    // on-times, so a frame either lands before it (a mode it set is kept,
+    // its setpoints and duties are then zeroed) or sees it and is dropped.
+    if (wdTripped)
+        return;
 
     if (rlht_set_setpoints_unpack(data, data_len, &v) != 0)
         return;
@@ -147,6 +188,14 @@ void handler_set_open_duty(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
     (void)ctx;
     (void)opcode;
     (void)user_data;
+
+    // Ignored while the watchdog is tripped, so nothing sent during a trip
+    // is stored and acted on when the trip is cleared. The trip sets
+    // wdTripped in the same masked window that zeroes the setpoints and
+    // on-times, so a frame either lands before it (a mode it set is kept,
+    // its setpoints and duties are then zeroed) or sees it and is dropped.
+    if (wdTripped)
+        return;
 
     if (rlht_set_open_duty_unpack(data, data_len, &v) != 0)
         return;
@@ -244,5 +293,6 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
 
     wdLastRxMs = millis();
     (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1,
-                                 RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG);
+                                 RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG |
+                                     RLHT_CAP_CLEAR_WATCHDOG_TRIP);
 }

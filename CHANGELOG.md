@@ -9,6 +9,14 @@ This project did not use formal release tags through most of its history, so thi
 ### Added
 
 - Added this curated root changelog, distilled from the complete Git history.
+- A handler for `BREAD_OP_CLEAR_WATCHDOG_TRIP` (0x7C, empty payload),
+  which clears a latched command-watchdog trip and nothing else. A frame
+  with a payload is rejected and the trip stays set. GET_CAPS advertises
+  `RLHT_CAP_CLEAR_WATCHDOG_TRIP` beside `RLHT_CAP_CMD_WATCHDOG`
+  (feastorg/Slice_DCMT#26).
+- A `WDCLEAR` serial command, the local operator's clear for a watchdog
+  trip. `firmware/README.md` documents the serial commands and the
+  watchdog.
 
 ### Changed
 
@@ -67,6 +75,20 @@ This project did not use formal release tags through most of its history, so thi
   heater kept running with no setpoint to stop it, and `SET_SETPOINTS(0, 0)`
   did nothing in open loop. `SET_MODE` and serial `MODE=` now start open
   loop at 0; re-sending open loop while already in it keeps the duty.
+- A command-watchdog trip now latches until an explicit clear (#9). Any
+  valid command frame used to clear it, so a heater command could release
+  a hold that a real bus failure had set; `SET_WATCHDOG` and every serial
+  line did too. Now only `BREAD_OP_CLEAR_WATCHDOG_TRIP`, the serial
+  `WDCLEAR` command or a reboot clears it. Command frames, replies,
+  `SET_WATCHDOG`, `WDOG=<ms>` and other serial lines still keep the
+  watchdog fed. While the trip is set, `SET_MODE`, `SET_SETPOINTS` and
+  `SET_OPEN_DUTY`, and the serial `MODE=`, `R1TEMP=`, `R2TEMP=`,
+  `R1TIME=` and `R2TIME=` commands, are ignored, so nothing sent during
+  a trip is acted on when it is cleared. Clearing resumes nothing: the
+  setpoints and on-times stay at 0 until a new setpoint or duty arrives,
+  and a PID then starts from an on-time of 0. A controller that
+  predates the clear has no remote way to clear a trip on this
+  firmware.
 
 ### Notes
 
