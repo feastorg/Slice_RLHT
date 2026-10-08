@@ -69,6 +69,13 @@ void handler_set_mode(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data
     if (mode != RLHT_MODE_CLOSED_LOOP && mode != RLHT_MODE_OPEN_LOOP)
         return;
 
+    // Entering open loop starts from 0, not from the PID's last on-time,
+    // which open loop would otherwise keep driving with no setpoint to stop it.
+    if (mode == RLHT_MODE_OPEN_LOOP && slice.mode != OPEN_LOOP)
+    {
+        slice.relayHeater1.relayOnTime = 0;
+        slice.relayHeater2.relayOnTime = 0;
+    }
     slice.mode = static_cast<ControlMode>(mode);
 }
 

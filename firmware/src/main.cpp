@@ -69,27 +69,39 @@ static volatile bool periodPending2 = false;
 MAX6675 thermocouple1(TC_CLK, TC_CS1, TC_DATA);
 MAX6675 thermocouple2(TC_CLK, TC_CS2, TC_DATA);
 
-PID relay1PID(&(slice.relayHeater1.inputTemperature), &(slice.relayHeater1.relayOnTime), &(slice.relayHeater1.setpointTemperature),
+// The PIDs work on main-loop-owned copies, never on slice fields the command
+// handlers write: writing a snapshot back into slice overwrote any command
+// that landed between the snapshot and the write-back (feastorg/Slice_RLHT#14).
+static double pidInput1 = 0.0;
+static double pidOutput1 = 0.0;
+static double pidSetpoint1 = 0.0;
+static double pidInput2 = 0.0;
+static double pidOutput2 = 0.0;
+static double pidSetpoint2 = 0.0;
+
+PID relay1PID(&pidInput1, &pidOutput1, &pidSetpoint1,
               slice.relayHeater1.Kp, slice.relayHeater1.Ki, slice.relayHeater1.Kd, DIRECT);
-PID relay2PID(&(slice.relayHeater2.inputTemperature), &(slice.relayHeater2.relayOnTime), &(slice.relayHeater2.setpointTemperature),
+PID relay2PID(&pidInput2, &pidOutput2, &pidSetpoint2,
               slice.relayHeater2.Kp, slice.relayHeater2.Ki, slice.relayHeater2.Kd, DIRECT);
 
-static void apply_mode_transition_if_needed()
+static void apply_mode_transition_if_needed(ControlMode mode)
 {
-    if (slice.mode == appliedMode)
+    if (mode == appliedMode)
         return;
 
-    // PID_v1 calls Initialize() on MANUAL->AUTOMATIC transitions.
-    // Apply mode only on transitions to avoid repeated integral re-seeding.
-    if (slice.mode == CLOSED_LOOP)
+    if (mode == CLOSED_LOOP)
     {
-        relay1PID.SetMode(AUTOMATIC);
-        relay2PID.SetMode(AUTOMATIC);
+        // Start from 0, not from the open-loop duty or an earlier PID output:
+        // computeHeater() switches each PID to automatic with a fresh input,
+        // and Initialize() seeds the integral from this output
+        // (feastorg/Slice_RLHT#17).
+        pidOutput1 = 0;
+        pidOutput2 = 0;
         appliedMode = CLOSED_LOOP;
         return;
     }
 
-    if (slice.mode == OPEN_LOOP)
+    if (mode == OPEN_LOOP)
     {
         relay1PID.SetMode(MANUAL);
         relay2PID.SetMode(MANUAL);
@@ -97,28 +109,25 @@ static void apply_mode_transition_if_needed()
     }
 }
 
-static void apply_tunings_if_needed()
+static void apply_tunings_if_needed(double kp1, double ki1, double kd1,
+                                    double kp2, double ki2, double kd2)
 {
     bool changed = !pidTuningsApplied ||
-                   slice.relayHeater1.Kp != lastKp1 ||
-                   slice.relayHeater1.Ki != lastKi1 ||
-                   slice.relayHeater1.Kd != lastKd1 ||
-                   slice.relayHeater2.Kp != lastKp2 ||
-                   slice.relayHeater2.Ki != lastKi2 ||
-                   slice.relayHeater2.Kd != lastKd2;
+                   kp1 != lastKp1 || ki1 != lastKi1 || kd1 != lastKd1 ||
+                   kp2 != lastKp2 || ki2 != lastKi2 || kd2 != lastKd2;
 
     if (!changed)
         return;
 
-    relay1PID.SetTunings(slice.relayHeater1.Kp, slice.relayHeater1.Ki, slice.relayHeater1.Kd);
-    relay2PID.SetTunings(slice.relayHeater2.Kp, slice.relayHeater2.Ki, slice.relayHeater2.Kd);
+    relay1PID.SetTunings(kp1, ki1, kd1);
+    relay2PID.SetTunings(kp2, ki2, kd2);
 
-    lastKp1 = slice.relayHeater1.Kp;
-    lastKi1 = slice.relayHeater1.Ki;
-    lastKd1 = slice.relayHeater1.Kd;
-    lastKp2 = slice.relayHeater2.Kp;
-    lastKi2 = slice.relayHeater2.Ki;
-    lastKd2 = slice.relayHeater2.Kd;
+    lastKp1 = kp1;
+    lastKi1 = ki1;
+    lastKd1 = kd1;
+    lastKp2 = kp2;
+    lastKi2 = ki2;
+    lastKd2 = kd2;
     pidTuningsApplied = true;
 }
 
@@ -126,21 +135,24 @@ static void apply_tunings_if_needed()
 // manual. PID_v1 re-initialises the integral from the output when it goes
 // back to automatic, so a heater starts from 0 when a setpoint returns,
 // instead of resuming the duty it had built up (feastorg/Slice_RLHT#13).
-static void computeHeater(PID &pid, RelayHeater &heater)
+static void computeHeater(PID &pid, double &pidSetpoint, double &pidInput, double &pidOutput,
+                          double setpoint, double input)
 {
-    if (heater.setpointTemperature <= 0)
+    if (setpoint <= 0)
     {
         pid.SetMode(MANUAL);
-        heater.relayOnTime = 0;
+        pidOutput = 0;
         return;
     }
-    if (isnan(heater.inputTemperature))
+    if (isnan(input))
     {
         // Before AUTOMATIC: a re-initialisation from a NaN input would make
         // the next Compute() NaN.
-        heater.relayOnTime = 0;
+        pidOutput = 0;
         return;
     }
+    pidSetpoint = setpoint;
+    pidInput = input;
     pid.SetMode(AUTOMATIC);
     pid.Compute();
 }
@@ -166,17 +178,21 @@ void setRelayPeriod(uint8_t relayId, uint16_t periodMs)
 // Apply deferred relay period changes from main loop context (PID not ISR-safe).
 static void applyPendingPeriods()
 {
+    // The period and the on-time clamp go in one masked window: the open-duty
+    // handler reads relayPeriod and writes relayOnTime from the ISR.
     if (periodPending1)
     {
         noInterrupts();
         uint16_t p = pendingPeriod1;
         periodPending1 = false;
-        interrupts();
-
         slice.relayHeater1.relayPeriod = p;
         if (slice.relayHeater1.relayOnTime > (double)p)
             slice.relayHeater1.relayOnTime = (double)p;
+        interrupts();
+
         relay1PID.SetOutputLimits(0, p);
+        if (pidOutput1 > (double)p)
+            pidOutput1 = (double)p;
     }
 
     if (periodPending2)
@@ -184,12 +200,14 @@ static void applyPendingPeriods()
         noInterrupts();
         uint16_t p = pendingPeriod2;
         periodPending2 = false;
-        interrupts();
-
         slice.relayHeater2.relayPeriod = p;
         if (slice.relayHeater2.relayOnTime > (double)p)
             slice.relayHeater2.relayOnTime = (double)p;
+        interrupts();
+
         relay2PID.SetOutputLimits(0, p);
+        if (pidOutput2 > (double)p)
+            pidOutput2 = (double)p;
     }
 }
 
@@ -258,6 +276,8 @@ void watchdogLogic()
     // ever sees this one at 0: drop the integral now.
     relay1PID.SetMode(MANUAL);
     relay2PID.SetMode(MANUAL);
+    pidOutput1 = 0;
+    pidOutput2 = 0;
     SLICE_DEBUG_PRINTLN(F("WATCHDOG TRIPPED: bus silent, relays off"));
 }
 
@@ -367,10 +387,9 @@ void setupRLHT()
     slice.relayHeater2.relayPeriod = clampRelayPeriod(slice.relayHeater2.relayPeriod);
     relay2PID.SetOutputLimits(0, slice.relayHeater2.relayPeriod);
 
-    relay1PID.SetMode(AUTOMATIC);
-    relay2PID.SetMode(AUTOMATIC);
     appliedMode = CLOSED_LOOP;
-    apply_tunings_if_needed();
+    apply_tunings_if_needed(slice.relayHeater1.Kp, slice.relayHeater1.Ki, slice.relayHeater1.Kd,
+                            slice.relayHeater2.Kp, slice.relayHeater2.Ki, slice.relayHeater2.Kd);
 
     timing.lastThermoRead = millis();
     timing.lastSerialPrint = millis();
@@ -432,6 +451,8 @@ void processEStop()
         // this one at 0.
         relay1PID.SetMode(MANUAL);
         relay2PID.SetMode(MANUAL);
+        pidOutput1 = 0;
+        pidOutput2 = 0;
 
         SLICE_DEBUG_PRINTLN(F("ESTOP PRESSED!"));
     }
@@ -488,17 +509,10 @@ void relayControlLogic()
     uint8_t tc2 = slice.relayHeater2.thermocoupleSelect;
     interrupts();
 
-    // Apply snapshot to slice for PID (which uses pointers into slice).
-    slice.relayHeater1.setpointTemperature = sp1;
-    slice.relayHeater2.setpointTemperature = sp2;
-    slice.relayHeater1.Kp = kp1;
-    slice.relayHeater1.Ki = ki1;
-    slice.relayHeater1.Kd = kd1;
-    slice.relayHeater2.Kp = kp2;
-    slice.relayHeater2.Ki = ki2;
-    slice.relayHeater2.Kd = kd2;
-    slice.relayHeater1.thermocoupleSelect = tc1;
-    slice.relayHeater2.thermocoupleSelect = tc2;
+    // The snapshot is read, never written back: the command handlers own
+    // mode, setpoints, gains, thermocouple selects and the open-loop on-times,
+    // and a write-back would overwrite a command that landed after the
+    // snapshot (feastorg/Slice_RLHT#14).
 
     // A tripped command watchdog holds the same safe state as e-stop until
     // fresh traffic clears the trip (ISR side).
@@ -512,9 +526,11 @@ void relayControlLogic()
         return;
     }
 
-    slice.mode = localMode;
-    apply_mode_transition_if_needed();
-    apply_tunings_if_needed();
+    apply_mode_transition_if_needed(localMode);
+    apply_tunings_if_needed(kp1, ki1, kd1, kp2, ki2, kd2);
+
+    double drive1;
+    double drive2;
 
     if (localMode == CLOSED_LOOP)
     {
@@ -530,7 +546,7 @@ void relayControlLogic()
             break;
         }
 
-        computeHeater(relay1PID, slice.relayHeater1);
+        computeHeater(relay1PID, pidSetpoint1, pidInput1, pidOutput1, sp1, slice.relayHeater1.inputTemperature);
 
 #if (RLHT_RELAY_COUNT >= 2)
         switch (tc2)
@@ -545,14 +561,30 @@ void relayControlLogic()
             break;
         }
 
-        computeHeater(relay2PID, slice.relayHeater2);
+        computeHeater(relay2PID, pidSetpoint2, pidInput2, pidOutput2, sp2, slice.relayHeater2.inputTemperature);
 #endif
+
+        drive1 = pidOutput1;
+        drive2 = pidOutput2;
+
+        // In closed loop the on-time is the PID's to publish. Skip it if a
+        // SET_MODE open landed during this pass: the on-time is the open-duty
+        // handler's from then on.
+        noInterrupts();
+        if (slice.mode == CLOSED_LOOP)
+        {
+            slice.relayHeater1.relayOnTime = pidOutput1;
+#if (RLHT_RELAY_COUNT >= 2)
+            slice.relayHeater2.relayOnTime = pidOutput2;
+#endif
+        }
+        interrupts();
     }
     else if (localMode == OPEN_LOOP)
     {
-        // In open-loop, use the ISR-provided on-times directly.
-        slice.relayHeater1.relayOnTime = onTime1;
-        slice.relayHeater2.relayOnTime = onTime2;
+        // In open loop, drive from the snapshot of the handler-written on-times.
+        drive1 = onTime1;
+        drive2 = onTime2;
     }
     else
     {
@@ -565,9 +597,14 @@ void relayControlLogic()
         return;
     }
 
-    actuateRelay(RELAY1, timing.relay1Start, (unsigned long)slice.relayHeater1.relayPeriod, (unsigned long)slice.relayHeater1.relayOnTime, slice.relay1State);
+    actuateRelay(RELAY1, timing.relay1Start, (unsigned long)slice.relayHeater1.relayPeriod, (unsigned long)drive1, slice.relay1State);
 #if (RLHT_RELAY_COUNT >= 2)
-    actuateRelay(RELAY2, timing.relay2Start, (unsigned long)slice.relayHeater2.relayPeriod, (unsigned long)slice.relayHeater2.relayOnTime, slice.relay2State);
+    actuateRelay(RELAY2, timing.relay2Start, (unsigned long)slice.relayHeater2.relayPeriod, (unsigned long)drive2, slice.relay2State);
+#else
+    // Gen1 has no second heater: its snapshot fields go unused.
+    (void)sp2;
+    (void)tc2;
+    (void)drive2;
 #endif
 }
 

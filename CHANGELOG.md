@@ -38,6 +38,24 @@ This project did not use formal release tags through most of its history, so thi
   and report channel 2 as off with a 0 on-time; channel-2 commands are still
   accepted (#21). `docs/hardware-revisions.md` records each generation's
   boards and pin map.
+- A command could be lost when its frame landed while the main loop was
+  running a heater: `relayControlLogic()` copied mode, setpoints, PID gains,
+  thermocouple selects and the open-loop on-times, then wrote the copies
+  back over anything the I2C handlers had written in between. On a gen1
+  rig, 10 of 16 open-loop duty frames were lost this way, `set_open_duty_pct
+  0/0` among them, so a controller's safe state did not stop the heater.
+  The main loop now only reads those fields; the PIDs work on their own
+  variables, and the closed-loop output is published only while the mode is
+  still closed loop (#14).
+- Entering closed loop seeded the PID from the open-loop on-time, so a
+  heater resumed the open-loop duty and, with Ki = 0, stayed there. Closed
+  loop now starts from 0, and the PID switches to automatic only with a
+  fresh input, so a non-zero Kd no longer adds a one-sample kick from the
+  last closed-loop reading (#17).
+- Entering open loop kept the PID's last on-time as the open-loop duty: the
+  heater kept running with no setpoint to stop it, and `SET_SETPOINTS(0, 0)`
+  did nothing in open loop. `SET_MODE` and serial `MODE=` now start open
+  loop at 0; re-sending open loop while already in it keeps the duty.
 
 ### Notes
 
