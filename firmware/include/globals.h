@@ -55,9 +55,12 @@ extern Timing timing;
 extern PID relay1PID;
 extern PID relay2PID;
 
-// Command watchdog (BREAD_OP_SET/GET_WATCHDOG): boots disarmed (timeout 0)
-// unless RLHT_WATCHDOG_BOOT_MS is defined. ISR handlers write these; main-loop
-// access goes through short masked windows (multi-byte volatiles on AVR).
+// Command watchdog (BREAD_OP_SET/GET/CLEAR_WATCHDOG*): boots disarmed
+// (timeout 0) unless RLHT_WATCHDOG_BOOT_MS is defined. A trip latches until
+// CLEAR_WATCHDOG_TRIP, the serial WDCLEAR command, or a reboot; mode,
+// setpoint and duty commands are ignored while it is set. ISR handlers
+// write these; main-loop access goes through short masked windows
+// (multi-byte volatiles on AVR).
 extern volatile uint16_t wdTimeoutMs;
 extern volatile unsigned long wdLastRxMs;
 extern volatile bool wdTripped;
@@ -84,6 +87,7 @@ void handler_set_periods(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *d
 void handler_set_tc_select(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data);
 void handler_set_open_duty(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data);
 void handler_set_watchdog(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data);
+void handler_clear_watchdog_trip(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data);
 void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data);
 void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data);
 void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data);

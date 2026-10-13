@@ -232,13 +232,17 @@ void loop()
 }
 
 // Fires for every CRC-valid inbound command frame (SET_REPLY excluded by
-// CRUMBS): any valid command proves a live master and clears a trip.
+// CRUMBS): any valid command proves a live master, so it stamps liveness.
+// It does not clear a trip (feastorg/Slice_RLHT#9). The trip latches until
+// an explicit clear: BREAD_OP_CLEAR_WATCHDOG_TRIP
+// (handler_clear_watchdog_trip), the serial WDCLEAR command, or a reboot.
+// SET_WATCHDOG re-arms without clearing (feastorg/Slice_DCMT#26), and
+// RLHT_CAP_CLEAR_WATCHDOG_TRIP in GET_CAPS tells a controller so.
 static void on_crumbs_message(crumbs_context_t *c, const crumbs_message_t *msg)
 {
     (void)c;
     (void)msg;
     wdLastRxMs = millis();
-    wdTripped = false;
 }
 
 void watchdogLogic()
@@ -272,8 +276,9 @@ void watchdogLogic()
     slice.relay1State = false;
     slice.relay2State = false;
     interrupts();
-    // A command that clears the trip may bring a setpoint before the loop
-    // ever sees this one at 0: drop the integral now.
+    // relayControlLogic() skips computeHeater() while tripped, so it never
+    // sees this setpoint at 0: drop the integral now. A setpoint sent after
+    // the clear then starts the PID from an on-time of 0.
     relay1PID.SetMode(MANUAL);
     relay2PID.SetMode(MANUAL);
     pidOutput1 = 0;
@@ -317,6 +322,10 @@ void setupSlice()
     rc = crumbs_register_handler(&ctx, BREAD_OP_SET_WATCHDOG, handler_set_watchdog, nullptr);
     if (rc != 0)
         SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register BREAD_OP_SET_WATCHDOG"));
+
+    rc = crumbs_register_handler(&ctx, BREAD_OP_CLEAR_WATCHDOG_TRIP, handler_clear_watchdog_trip, nullptr);
+    if (rc != 0)
+        SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register BREAD_OP_CLEAR_WATCHDOG_TRIP"));
 
     rc = crumbs_register_reply_handler(&ctx, 0x00, reply_version, nullptr);
     if (rc != 0)
@@ -447,8 +456,9 @@ void processEStop()
         interrupts();
 
         relaysLow();
-        // As for a watchdog trip: a setpoint may arrive before the loop sees
-        // this one at 0.
+        // A setpoint sent while the e-stop is held is still stored, and the
+        // loop skips computeHeater() until release, so it may never see this
+        // one at 0: drop the integral now.
         relay1PID.SetMode(MANUAL);
         relay2PID.SetMode(MANUAL);
         pidOutput1 = 0;
@@ -515,7 +525,7 @@ void relayControlLogic()
     // snapshot (feastorg/Slice_RLHT#14).
 
     // A tripped command watchdog holds the same safe state as e-stop until
-    // fresh traffic clears the trip (ISR side).
+    // an explicit clear (CLEAR_WATCHDOG_TRIP or serial WDCLEAR).
     if (localEStop)
     {
         relaysLow();
