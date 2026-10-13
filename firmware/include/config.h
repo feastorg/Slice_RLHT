@@ -1,8 +1,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// Hardware generation has no default: it selects the relay pin map, and a
+// wrong guess drives pins the board does not have (#27).
 #ifndef RLHT_HW_GEN
-#define RLHT_HW_GEN 2
+#error "RLHT_HW_GEN is not set: build a gen* env from firmware/platformio.ini, e.g. pio run -e gen2_nano"
 #endif
 
 // Bus address is independent of hardware generation.
