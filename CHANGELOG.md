@@ -42,6 +42,15 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- A build without `RLHT_HW_GEN` now fails instead of building gen2 (#27).
+  `config.h` defaulted the generation to 2 when the flag was absent, so the
+  `#error "Unsupported RLHT_HW_GEN value"` in `config_hardware.h` could only
+  catch an out-of-range value, never a missing one, and `pio run -e
+  nano_base` produced the gen2 profile, which on a gen1 board drives the
+  unconnected D5 and D7. The `gen*` environments all set the flag and are
+  unaffected; `nano_base` and `nanoevery_base`, which exist only to be
+  extended, now fail to build. Firmware Build checks that a build without
+  the flag is rejected. Same fix as feastorg/Slice_DCMT#17.
 - The PID integral survived `SET_SETPOINTS(0, 0)`, a command-watchdog trip
   and an e-stop. A heater kept running after the safe state, and resumed its
   old duty when a trip cleared or an e-stop was released, decaying only
