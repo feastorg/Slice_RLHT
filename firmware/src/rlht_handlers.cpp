@@ -284,6 +284,9 @@ void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_
 
     crumbs_msg_init(reply, RLHT_TYPE_ID, RLHT_OP_GET_STATE);
     (void)rlht_state_pack(reply, &s);
+    // RLHT_CAP_ESTOP_COUNT: append estop_count at RLHT_STATE_OFF_ESTOP_COUNT,
+    // making the reply 20 bytes (rlht_state_pack writes the first 19).
+    (void)crumbs_msg_add_u8(reply, estopCount);
 }
 
 void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
@@ -294,5 +297,5 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
     wdLastRxMs = millis();
     (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1,
                                  RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG |
-                                     RLHT_CAP_CLEAR_WATCHDOG_TRIP);
+                                     RLHT_CAP_CLEAR_WATCHDOG_TRIP | RLHT_CAP_ESTOP_COUNT);
 }
