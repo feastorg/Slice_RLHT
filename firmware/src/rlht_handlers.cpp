@@ -183,8 +183,18 @@ void handler_set_periods(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *d
         return;
     }
 
-    setRelayPeriod(1, v.p1_ms);
-    setRelayPeriod(2, v.p2_ms);
+    // A period outside RLHT_PERIOD_MIN_MS..RLHT_PERIOD_MAX_MS is not one the
+    // contract defines: that relay keeps its period, the other still takes
+    // its own, and the frame is refused. (setRelayPeriod's clamp is for the
+    // serial R1PERIOD=/R2PERIOD= path.)
+    const bool p1_ok = (v.p1_ms >= RLHT_PERIOD_MIN_MS && v.p1_ms <= RLHT_PERIOD_MAX_MS);
+    const bool p2_ok = (v.p2_ms >= RLHT_PERIOD_MIN_MS && v.p2_ms <= RLHT_PERIOD_MAX_MS);
+    if (p1_ok)
+        setRelayPeriod(1, v.p1_ms);
+    if (p2_ok)
+        setRelayPeriod(2, v.p2_ms);
+    if (!p1_ok || !p2_ok)
+        (void)crumbs_refuse(ctx, BREAD_REFUSE_UNDEFINED_VALUE);
 }
 
 void handler_set_tc_select(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
@@ -234,22 +244,23 @@ void handler_set_open_duty(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
         return;
     }
 
-    uint8_t d1 = v.duty1_pct;
-    uint8_t d2 = v.duty2_pct;
-
     if (slice.mode != OPEN_LOOP)
     {
         (void)crumbs_refuse(ctx, BREAD_REFUSE_WRONG_MODE);
         return;
     }
 
-    if (d1 > 100)
-        d1 = 100;
-    if (d2 > 100)
-        d2 = 100;
-
-    slice.relayHeater1.relayOnTime = map(d1, 0, 100, 0, slice.relayHeater1.relayPeriod);
-    slice.relayHeater2.relayOnTime = map(d2, 0, 100, 0, slice.relayHeater2.relayPeriod);
+    // A duty above RLHT_OPEN_DUTY_MAX_PCT is not one the contract defines:
+    // that heater keeps its on-time, the other still takes its own, and the
+    // frame is refused.
+    const bool d1_ok = (v.duty1_pct <= RLHT_OPEN_DUTY_MAX_PCT);
+    const bool d2_ok = (v.duty2_pct <= RLHT_OPEN_DUTY_MAX_PCT);
+    if (d1_ok)
+        slice.relayHeater1.relayOnTime = map(v.duty1_pct, 0, RLHT_OPEN_DUTY_MAX_PCT, 0, slice.relayHeater1.relayPeriod);
+    if (d2_ok)
+        slice.relayHeater2.relayOnTime = map(v.duty2_pct, 0, RLHT_OPEN_DUTY_MAX_PCT, 0, slice.relayHeater2.relayPeriod);
+    if (!d1_ok || !d2_ok)
+        (void)crumbs_refuse(ctx, BREAD_REFUSE_UNDEFINED_VALUE);
 }
 
 void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)

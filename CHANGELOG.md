@@ -58,16 +58,21 @@ This project did not use formal release tags through most of its history, so thi
     u16, a CLEAR_WATCHDOG_TRIP with a payload;
   - `WATCHDOG_TRIP`: SET_MODE, SET_SETPOINTS and SET_OPEN_DUTY while a trip
     is held;
-  - `UNDEFINED_VALUE`: a SET_MODE other than open or closed loop, and a
-    SET_TC_SELECT with a channel other than 1 or 2. That SET_TC_SELECT
-    still sets its other channel before it refuses;
+  - `UNDEFINED_VALUE`: a SET_MODE other than open or closed loop, a
+    SET_TC_SELECT with a channel other than 1 or 2, a SET_PERIODS period
+    outside `RLHT_PERIOD_MIN_MS` to `RLHT_PERIOD_MAX_MS` (100-10000 ms),
+    and a SET_OPEN_DUTY duty above `RLHT_OPEN_DUTY_MAX_PCT` (100). Periods
+    and duties were clamped before. In each, a channel out of range keeps
+    its value, the other channel still takes its own, and then the frame
+    is refused;
   - `WRONG_MODE`: SET_OPEN_DUTY outside open loop;
   - `UNKNOWN_OP`: an opcode neither RLHT nor bread-common defines, refused
     in `on_crumbs_message`. Its watchdog stamp still runs first for every
     valid frame, a refused one included.
 
-  GET_CAPS advertises `RLHT_CAP_REFUSES`. Clamped periods and duties are
-  still applied, as before.
+  GET_CAPS advertises `RLHT_CAP_REFUSES`. The serial `R1PERIOD=` and
+  `R2PERIOD=` commands still clamp to the same range, which
+  `clampRelayPeriod` now takes from the contract constants.
 - A build without `RLHT_HW_GEN` now fails instead of building gen2 (#27).
   `config.h` defaulted the generation to 2 when the flag was absent, so the
   `#error "Unsupported RLHT_HW_GEN value"` in `config_hardware.h` could only

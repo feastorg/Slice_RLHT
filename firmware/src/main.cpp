@@ -44,12 +44,14 @@ static double lastKp2 = 0.0;
 static double lastKi2 = 0.0;
 static double lastKd2 = 0.0;
 
+// The contract's period range (rlht_ops.h). SET_PERIODS over I2C refuses a
+// period outside it; the serial path and the boot defaults clamp to it.
 static uint16_t clampRelayPeriod(uint16_t p)
 {
-    if (p < 100u)
-        return 100u;
-    if (p > 10000u)
-        return 10000u;
+    if (p < RLHT_PERIOD_MIN_MS)
+        return RLHT_PERIOD_MIN_MS;
+    if (p > RLHT_PERIOD_MAX_MS)
+        return RLHT_PERIOD_MAX_MS;
     return p;
 }
 
