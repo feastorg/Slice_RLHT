@@ -41,6 +41,9 @@ This project did not use formal release tags through most of its history, so thi
   instead of 1205, as for a CRUMBS 0.16 build.
 - Requires CRUMBS `^0.16.0` and `bread-crumbs-contracts` `^0.8.0`
   (`firmware/platformio.ini`), for CRUMBS 0.16.0's SET acknowledgement.
+- Requires bread-crumbs-contracts `^0.9.0` (`firmware/platformio.ini` and
+  `slice.yaml`), for `bread_refuse.h`, `RLHT_CAP_REFUSES` and the
+  `RLHT_PERIOD_*`/`RLHT_OPEN_DUTY_MAX_PCT` ranges.
 - The default I2C address is now 19 (0x13), was 10 (0x0A). 0x0A is in
   the SMBus range 0x08-0x0B that CRUMBS's `docs/protocol.md` says to
   avoid (#12). A board flashed without `-DI2C_ADR` answers at 0x13, so
@@ -48,6 +51,31 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **GET_ACK now reports a dropped SET as refused** (#34). Before this, no
+  handler called `crumbs_refuse()`, and `on_crumbs_message`, registered as
+  `on_message`, made CRUMBS count every decoded frame as applied, including
+  SET_SETPOINTS while tripped and a SET_MODE the contract does not define.
+  Each early return now refuses with a `BREAD_REFUSE_*` reason
+  (bread-crumbs-contracts `bread_refuse.h`):
+  - `MALFORMED`: a payload that does not unpack, a SET_WATCHDOG without its
+    u16, a CLEAR_WATCHDOG_TRIP with a payload;
+  - `WATCHDOG_TRIP`: SET_MODE, SET_SETPOINTS and SET_OPEN_DUTY while a trip
+    is held;
+  - `UNDEFINED_VALUE`: a SET_MODE other than open or closed loop, a
+    SET_TC_SELECT with a channel other than 1 or 2, a SET_PERIODS period
+    outside `RLHT_PERIOD_MIN_MS` to `RLHT_PERIOD_MAX_MS` (100-10000 ms),
+    and a SET_OPEN_DUTY duty above `RLHT_OPEN_DUTY_MAX_PCT` (100). Periods
+    and duties were clamped before. In each, a channel out of range keeps
+    its value, the other channel still takes its own, and then the frame
+    is refused;
+  - `WRONG_MODE`: SET_OPEN_DUTY outside open loop;
+  - `UNKNOWN_OP`: an opcode neither RLHT nor bread-common defines, refused
+    in `on_crumbs_message`. Its watchdog stamp still runs first for every
+    valid frame, a refused one included.
+
+  GET_CAPS advertises `RLHT_CAP_REFUSES`. The serial `R1PERIOD=` and
+  `R2PERIOD=` commands still clamp to the same range, which
+  `clampRelayPeriod` now takes from the contract constants.
 - A build without `RLHT_HW_GEN` now fails instead of building gen2 (#27).
   `config.h` defaulted the generation to 2 when the flag was absent, so the
   `#error "Unsupported RLHT_HW_GEN value"` in `config_hardware.h` could only

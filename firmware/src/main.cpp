@@ -44,12 +44,14 @@ static double lastKp2 = 0.0;
 static double lastKi2 = 0.0;
 static double lastKd2 = 0.0;
 
+// The contract's period range (rlht_ops.h). SET_PERIODS over I2C refuses a
+// period outside it; the serial path and the boot defaults clamp to it.
 static uint16_t clampRelayPeriod(uint16_t p)
 {
-    if (p < 100u)
-        return 100u;
-    if (p > 10000u)
-        return 10000u;
+    if (p < RLHT_PERIOD_MIN_MS)
+        return RLHT_PERIOD_MIN_MS;
+    if (p > RLHT_PERIOD_MAX_MS)
+        return RLHT_PERIOD_MAX_MS;
     return p;
 }
 
@@ -239,11 +241,31 @@ void loop()
 // (handler_clear_watchdog_trip), the serial WDCLEAR command, or a reboot.
 // SET_WATCHDOG re-arms without clearing (feastorg/Slice_DCMT#26), and
 // RLHT_CAP_CLEAR_WATCHDOG_TRIP in GET_CAPS tells a controller so.
+//
+// Every valid frame stamps liveness, a refused one included: the watchdog
+// watches for a live master, not for commands it accepts. on_message runs
+// before the opcode's handler, so a frame whose opcode neither RLHT nor
+// bread-common defines is refused here; CRUMBS cannot reject it itself,
+// since on_message takes every frame.
+#define RLHT_DEFINED_OP_CASE_(name, value) case (value):
+static bool is_defined_op(uint8_t opcode)
+{
+    switch (opcode)
+    {
+        RLHT_OPS(RLHT_DEFINED_OP_CASE_)
+        BREAD_COMMON_OPS(RLHT_DEFINED_OP_CASE_)
+        return true;
+    default:
+        return false;
+    }
+}
+#undef RLHT_DEFINED_OP_CASE_
+
 static void on_crumbs_message(crumbs_context_t *c, const crumbs_message_t *msg)
 {
-    (void)c;
-    (void)msg;
     wdLastRxMs = millis();
+    if (!is_defined_op(msg->opcode))
+        (void)crumbs_refuse(c, BREAD_REFUSE_UNKNOWN_OP);
 }
 
 void watchdogLogic()
