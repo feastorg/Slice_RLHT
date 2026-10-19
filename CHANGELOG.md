@@ -41,6 +41,9 @@ This project did not use formal release tags through most of its history, so thi
   instead of 1205, as for a CRUMBS 0.16 build.
 - Requires CRUMBS `^0.16.0` and `bread-crumbs-contracts` `^0.8.0`
   (`firmware/platformio.ini`), for CRUMBS 0.16.0's SET acknowledgement.
+- Requires bread-crumbs-contracts `^0.9.0` (`firmware/platformio.ini` and
+  `slice.yaml`), for `bread_refuse.h`, `RLHT_CAP_REFUSES` and the
+  `RLHT_PERIOD_*`/`RLHT_OPEN_DUTY_MAX_PCT` ranges.
 - The default I2C address is now 19 (0x13), was 10 (0x0A). 0x0A is in
   the SMBus range 0x08-0x0B that CRUMBS's `docs/protocol.md` says to
   avoid (#12). A board flashed without `-DI2C_ADR` answers at 0x13, so
