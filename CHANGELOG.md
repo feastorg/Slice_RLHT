@@ -39,6 +39,10 @@ This project did not use formal release tags through most of its history, so thi
   (`firmware/platformio.ini`). Contracts 0.6.0 is not on the PlatformIO
   registry yet, so the firmware build fails to resolve its dependencies
   until it is published.
+- The default I2C address is now 19 (0x13), was 10 (0x0A). 0x0A is in
+  the SMBus range 0x08-0x0B that CRUMBS's `docs/protocol.md` says to
+  avoid (#12). A board flashed without `-DI2C_ADR` answers at 0x13, so
+  a controller that addressed 0x0A needs its address map updated.
 
 ### Fixed
 

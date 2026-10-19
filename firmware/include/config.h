@@ -9,8 +9,9 @@
 
 // Bus address is independent of hardware generation.
 // Override with a build flag: -DI2C_ADR=<addr>
+// 19 (0x13) is outside the addresses CRUMBS says to avoid (#12).
 #ifndef I2C_ADR
-#define I2C_ADR 10
+#define I2C_ADR 19
 #endif
 
 #ifdef SLICE_DEBUG
