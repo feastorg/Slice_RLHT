@@ -48,6 +48,26 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **GET_ACK now reports a dropped SET as refused** (#34). Before this, no
+  handler called `crumbs_refuse()`, and `on_crumbs_message`, registered as
+  `on_message`, made CRUMBS count every decoded frame as applied, including
+  SET_SETPOINTS while tripped and a SET_MODE the contract does not define.
+  Each early return now refuses with a `BREAD_REFUSE_*` reason
+  (bread-crumbs-contracts `bread_refuse.h`):
+  - `MALFORMED`: a payload that does not unpack, a SET_WATCHDOG without its
+    u16, a CLEAR_WATCHDOG_TRIP with a payload;
+  - `WATCHDOG_TRIP`: SET_MODE, SET_SETPOINTS and SET_OPEN_DUTY while a trip
+    is held;
+  - `UNDEFINED_VALUE`: a SET_MODE other than open or closed loop, and a
+    SET_TC_SELECT with a channel other than 1 or 2. That SET_TC_SELECT
+    still sets its other channel before it refuses;
+  - `WRONG_MODE`: SET_OPEN_DUTY outside open loop;
+  - `UNKNOWN_OP`: an opcode neither RLHT nor bread-common defines, refused
+    in `on_crumbs_message`. Its watchdog stamp still runs first for every
+    valid frame, a refused one included.
+
+  GET_CAPS advertises `RLHT_CAP_REFUSES`. Clamped periods and duties are
+  still applied, as before.
 - A build without `RLHT_HW_GEN` now fails instead of building gen2 (#27).
   `config.h` defaulted the generation to 2 when the flag was absent, so the
   `#error "Unsupported RLHT_HW_GEN value"` in `config_hardware.h` could only
