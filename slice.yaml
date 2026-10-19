@@ -72,7 +72,7 @@ electrical:
 interfaces:
   host:
     type: "i2c"
-    address_default: 10
+    address_default: 19
     address_configurable: true
   data:
     inputs:
