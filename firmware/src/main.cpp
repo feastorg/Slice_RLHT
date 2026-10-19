@@ -26,6 +26,7 @@ volatile uint16_t wdTimeoutMs = 0;
 volatile unsigned long wdLastRxMs = 0;
 volatile bool wdTripped = false;
 volatile uint8_t wdTripCount = 0;
+volatile uint8_t estopCount = 0;
 
 static const unsigned long ESTOP_DEBOUNCE_MS = 25;
 static bool estopDebouncePending = false;
@@ -446,6 +447,10 @@ void processEStop()
     if (digitalRead(ESTOP) == LOW)
     {
         noInterrupts();
+        // Count a new press only (released -> pressed), so a held press that
+        // re-syncs, or the boot sync, is not recounted. Wraps at 255.
+        if (!slice.eStop)
+            estopCount++;
         slice.relayHeater1.setpointTemperature = 0;
         slice.relayHeater2.setpointTemperature = 0;
         slice.relayHeater1.relayOnTime = 0;

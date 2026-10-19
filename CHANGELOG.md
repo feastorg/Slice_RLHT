@@ -17,11 +17,15 @@ This project did not use formal release tags through most of its history, so thi
 - A `WDCLEAR` serial command, the local operator's clear for a watchdog
   trip. `firmware/README.md` documents the serial commands and the
   watchdog.
+- `estop_count` in the GET_STATE reply: hardware e-stop presses since boot,
+  wrapping at 255, appended after the 19-byte layout
+  (`RLHT_STATE_OFF_ESTOP_COUNT`), so a controller sees a press it did not
+  poll during. GET_CAPS advertises `RLHT_CAP_ESTOP_COUNT` (contracts 0.7.0).
 
 ### Changed
 
-- Updated active firmware metadata to reference CRUMBS `0.12.4` and
-  `bread-crumbs-contracts` `0.4.3`.
+- Updated active firmware metadata to reference CRUMBS `0.16.0` and
+  `bread-crumbs-contracts` `0.8.0`.
 - Split the `relayControlLogic()` shared-state snapshot into three short
   interrupt-masked windows (worst case ~18 bytes instead of ~44). Long
   `noInterrupts()` windows delay TWI ISR entry and force a clock stretch
@@ -33,12 +37,10 @@ This project did not use formal release tags through most of its history, so thi
   reply with `rlht_state_pack()`, instead of reading and writing
   hand-written offsets (#11). The layouts now live in one place, shared
   with the controller side. Handler behaviour and the bytes on the wire
-  are unchanged; the version reply's CRUMBS version field reports 1400
-  instead of 1205, as for any CRUMBS 0.14 build.
-- Requires CRUMBS `^0.14.0` and `bread-crumbs-contracts` `^0.6.0`
-  (`firmware/platformio.ini`). Contracts 0.6.0 is not on the PlatformIO
-  registry yet, so the firmware build fails to resolve its dependencies
-  until it is published.
+  are unchanged; the version reply's CRUMBS version field reports 1600
+  instead of 1205, as for a CRUMBS 0.16 build.
+- Requires CRUMBS `^0.16.0` and `bread-crumbs-contracts` `^0.8.0`
+  (`firmware/platformio.ini`), for CRUMBS 0.16.0's SET acknowledgement.
 - The default I2C address is now 19 (0x13), was 10 (0x0A). 0x0A is in
   the SMBus range 0x08-0x0B that CRUMBS's `docs/protocol.md` says to
   avoid (#12). A board flashed without `-DI2C_ADR` answers at 0x13, so

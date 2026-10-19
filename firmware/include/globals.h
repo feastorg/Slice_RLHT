@@ -65,6 +65,8 @@ extern volatile uint16_t wdTimeoutMs;
 extern volatile unsigned long wdLastRxMs;
 extern volatile bool wdTripped;
 extern volatile uint8_t wdTripCount;
+// Hardware e-stop presses since boot, wraps at 255 (RLHT_CAP_ESTOP_COUNT).
+extern volatile uint8_t estopCount;
 
 void setupSlice();
 void setupRLHT();
