@@ -17,7 +17,6 @@
 #include "globals.h"
 
 static crumbs_context_t ctx;
-volatile bool estopTriggered = false;
 CRGB led;
 
 // Command watchdog state (see globals.h). ISR-written; main loop snapshots
@@ -29,8 +28,8 @@ volatile uint8_t wdTripCount = 0;
 volatile uint8_t estopCount = 0;
 
 static const unsigned long ESTOP_DEBOUNCE_MS = 25;
-static bool estopDebouncePending = false;
-static unsigned long estopDebounceStartMs = 0;
+static bool estopReleasePending = false;
+static unsigned long estopReleaseStartMs = 0;
 
 RLHT_SLICE slice;
 Timing timing = {0};
@@ -219,7 +218,12 @@ void setup()
     wdt_disable();
     setupSlice();
     setupRLHT();
-    delay(1000);
+    // I2C is live from setupSlice(), so sample the e-stop through the boot
+    // second instead of sleeping: a line held at power-up, or pressed now,
+    // is asserted before loop() runs.
+    const unsigned long bootStartMs = millis();
+    while (millis() - bootStartMs < 1000)
+        pollEStop();
     wdt_enable(WDTO_1S);
 }
 
@@ -382,8 +386,6 @@ void setupSlice()
 
     // e-stop: no external bias resistor on current boards, so use internal pull-up.
     pinMode(ESTOP, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(ESTOP), estopISR, CHANGE);
-    estopTriggered = true; // Force initial debounced state sync after boot.
 
     SLICE_DEBUG_PRINTLN(F("RLHT SLICE INITIALIZED"));
     SLICE_DEBUG_PRINT(F("VERSION: "));
@@ -429,19 +431,31 @@ void setupRLHT()
     timing.relay2Start = millis();
 }
 
+// The line is sampled on every pass, not edge-triggered. The first LOW
+// sample asserts the e-stop, so bounce or an edge train cannot postpone a
+// stop (#29); release needs the line HIGH for ESTOP_DEBOUNCE_MS without a
+// single LOW sample.
 void pollEStop()
 {
-    if (estopTriggered)
+    // Internal pull-up means asserted e-stop pulls the line LOW.
+    if (digitalRead(ESTOP) == LOW)
     {
-        estopTriggered = false;
-        estopDebouncePending = true;
-        estopDebounceStartMs = millis();
+        estopReleasePending = false;
+        if (!slice.eStop)
+            processEStop(true);
     }
-
-    if (estopDebouncePending && (millis() - estopDebounceStartMs >= ESTOP_DEBOUNCE_MS))
+    else if (slice.eStop)
     {
-        processEStop();
-        estopDebouncePending = false;
+        if (!estopReleasePending)
+        {
+            estopReleasePending = true;
+            estopReleaseStartMs = millis();
+        }
+        else if (millis() - estopReleaseStartMs >= ESTOP_DEBOUNCE_MS)
+        {
+            estopReleasePending = false;
+            processEStop(false);
+        }
     }
 
 #if RLHT_HAS_STATUS_LED
@@ -458,19 +472,14 @@ void pollEStop()
 #endif
 }
 
-void estopISR()
-{
-    estopTriggered = true;
-}
 
-void processEStop()
+void processEStop(bool pressed)
 {
-    // Internal pull-up means asserted e-stop pulls the line LOW.
-    if (digitalRead(ESTOP) == LOW)
+    if (pressed)
     {
         noInterrupts();
-        // Count a new press only (released -> pressed), so a held press that
-        // re-syncs, or the boot sync, is not recounted. Wraps at 255.
+        // Count a new press only (released -> pressed). A line held at
+        // power-up counts as one press. Wraps at 255.
         if (!slice.eStop)
             estopCount++;
         slice.relayHeater1.setpointTemperature = 0;

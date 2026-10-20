@@ -48,7 +48,6 @@ struct Timing
     unsigned long relay2Start;
 };
 
-extern volatile bool estopTriggered;
 extern CRGB led;
 extern RLHT_SLICE slice;
 extern Timing timing;
@@ -71,8 +70,7 @@ extern volatile uint8_t estopCount;
 void setupSlice();
 void setupRLHT();
 void pollEStop();
-void estopISR();
-void processEStop();
+void processEStop(bool pressed);
 void watchdogLogic();
 void measureThermocouples();
 void relayControlLogic();
