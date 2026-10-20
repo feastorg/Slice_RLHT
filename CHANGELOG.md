@@ -52,6 +52,11 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **A GET opcode sent as a command frame is refused** (#36). GET_STATE,
+  GET_WATCHDOG and GET_CAPS are queries, answered through SET_REPLY. Sent
+  as a command frame, nothing handled them, yet GET_ACK reported them
+  applied. They are now refused with `BREAD_REFUSE_UNKNOWN_OP`, like any
+  other opcode with no command behind it.
 - **Commands sent while the e-stop is held no longer heat at the release**
   (#37). The press zeroed the setpoints and on-times, but SET_MODE,
   SET_SETPOINTS and SET_OPEN_DUTY sent during the hold were stored, so
