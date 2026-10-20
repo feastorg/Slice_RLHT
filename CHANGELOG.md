@@ -24,6 +24,12 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Changed
 
+- The PlatformIO platforms are pinned: `platformio/atmelavr @ 5.3.0` and
+  `platformio/atmelmegaavr @ 1.10.0`, the versions local builds and CI
+  already resolved. Before, a clean build took whatever platform release
+  was newest, so the compiler and Arduino core could change between two
+  builds of the same commit. A platform update is now a change to
+  `firmware/platformio.ini`.
 - Updated active firmware metadata to reference CRUMBS `0.16.0` and
   `bread-crumbs-contracts` `0.8.0`.
 - Split the `relayControlLogic()` shared-state snapshot into three short
