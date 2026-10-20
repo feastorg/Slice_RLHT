@@ -216,6 +216,10 @@ static void applyPendingPeriods()
 void setup()
 {
     wdt_disable();
+    // e-stop: no external bias resistor on current boards, so use the internal
+    // pull-up. Enable it first, so it has the rest of setup to charge the
+    // line before the first sample below.
+    pinMode(ESTOP, INPUT_PULLUP);
     setupSlice();
     setupRLHT();
     // I2C is live from setupSlice(), so sample the e-stop through the boot
@@ -384,9 +388,6 @@ void setupSlice()
     FastLED.show();
 #endif
 
-    // e-stop: no external bias resistor on current boards, so use internal pull-up.
-    pinMode(ESTOP, INPUT_PULLUP);
-
     SLICE_DEBUG_PRINTLN(F("RLHT SLICE INITIALIZED"));
     SLICE_DEBUG_PRINT(F("VERSION: "));
     SLICE_DEBUG_PRINT(RLHT_MODULE_VER_MAJOR);
@@ -471,7 +472,6 @@ void pollEStop()
     }
 #endif
 }
-
 
 void processEStop(bool pressed)
 {
