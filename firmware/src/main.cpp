@@ -224,7 +224,8 @@ void setup()
     setupRLHT();
     // I2C is live from setupSlice(), so sample the e-stop through the boot
     // second instead of sleeping: a line held at power-up, or pressed now,
-    // is asserted before loop() runs.
+    // is asserted before loop() runs. The status LED stays blue through it;
+    // loop() shows the e-stop state from its first pass.
     const unsigned long bootStartMs = millis();
     while (millis() - bootStartMs < 1000)
         pollEStop();
@@ -235,6 +236,7 @@ void loop()
 {
     wdt_reset();
     pollEStop();
+    updateStatusLed();
     watchdogLogic();
     measureThermocouples();
     relayControlLogic();
@@ -471,17 +473,22 @@ void pollEStop()
             processEStop(false);
         }
     }
+}
 
+// Red while the e-stop is held, green otherwise, written only on a change.
+// Called from loop() only. The boot wait in setup() polls the e-stop too, and
+// when pollEStop() wrote the LED, its first pass replaced the boot blue
+// within microseconds.
+void updateStatusLed()
+{
 #if RLHT_HAS_STATUS_LED
+    static CRGB lastLed = CRGB::Black;
+    CRGB next = slice.eStop ? CRGB::Red : CRGB::Green;
+    if (next != lastLed)
     {
-        static CRGB lastLed = CRGB::Black;
-        CRGB next = slice.eStop ? CRGB::Red : CRGB::Green;
-        if (next != lastLed)
-        {
-            led = next;
-            FastLED.show();
-            lastLed = next;
-        }
+        led = next;
+        FastLED.show();
+        lastLed = next;
     }
 #endif
 }
