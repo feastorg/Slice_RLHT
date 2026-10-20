@@ -28,6 +28,18 @@ static double deci_c_to_temp(int16_t t)
     return ((double)t) / 10.0;
 }
 
+// 0 if no hold is in force, else the reason to refuse a heat-starting
+// command with (RLHT_CAP_ESTOP_HOLD). An e-stop wins over a watchdog trip:
+// clearing the trip does not lift the e-stop hold.
+static uint8_t hold_refuse_reason()
+{
+    if (slice.eStop)
+        return BREAD_REFUSE_ESTOP;
+    if (wdTripped)
+        return BREAD_REFUSE_WATCHDOG_TRIP;
+    return 0;
+}
+
 void handler_set_watchdog(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
     uint16_t timeout_ms = 0;
@@ -91,14 +103,16 @@ void handler_set_mode(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data
     (void)opcode;
     (void)user_data;
 
-    // Refused while the watchdog is tripped, so nothing sent during a trip
-    // is stored and acted on when the trip is cleared. The trip sets
-    // wdTripped in the same masked window that zeroes the setpoints and
-    // on-times, so a frame either lands before it (a mode it set is kept,
-    // its setpoints and duties are then zeroed) or sees it and is dropped.
-    if (wdTripped)
+    // Refused while the watchdog is tripped or the e-stop is held, so nothing
+    // sent during a hold is stored and acted on when it ends. The trip and
+    // the press each set their flag in the same masked window that zeroes
+    // the setpoints and on-times, so a frame either lands before it (a mode
+    // it set is kept, its setpoints and duties are then zeroed) or sees it
+    // and is refused.
+    const uint8_t hold = hold_refuse_reason();
+    if (hold != 0)
     {
-        (void)crumbs_refuse(ctx, BREAD_REFUSE_WATCHDOG_TRIP);
+        (void)crumbs_refuse(ctx, hold);
         return;
     }
 
@@ -130,14 +144,16 @@ void handler_set_setpoints(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
     (void)opcode;
     (void)user_data;
 
-    // Refused while the watchdog is tripped, so nothing sent during a trip
-    // is stored and acted on when the trip is cleared. The trip sets
-    // wdTripped in the same masked window that zeroes the setpoints and
-    // on-times, so a frame either lands before it (a mode it set is kept,
-    // its setpoints and duties are then zeroed) or sees it and is dropped.
-    if (wdTripped)
+    // Refused while the watchdog is tripped or the e-stop is held, so nothing
+    // sent during a hold is stored and acted on when it ends. The trip and
+    // the press each set their flag in the same masked window that zeroes
+    // the setpoints and on-times, so a frame either lands before it (a mode
+    // it set is kept, its setpoints and duties are then zeroed) or sees it
+    // and is refused.
+    const uint8_t hold = hold_refuse_reason();
+    if (hold != 0)
     {
-        (void)crumbs_refuse(ctx, BREAD_REFUSE_WATCHDOG_TRIP);
+        (void)crumbs_refuse(ctx, hold);
         return;
     }
 
@@ -227,14 +243,16 @@ void handler_set_open_duty(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
     (void)opcode;
     (void)user_data;
 
-    // Refused while the watchdog is tripped, so nothing sent during a trip
-    // is stored and acted on when the trip is cleared. The trip sets
-    // wdTripped in the same masked window that zeroes the setpoints and
-    // on-times, so a frame either lands before it (a mode it set is kept,
-    // its setpoints and duties are then zeroed) or sees it and is dropped.
-    if (wdTripped)
+    // Refused while the watchdog is tripped or the e-stop is held, so nothing
+    // sent during a hold is stored and acted on when it ends. The trip and
+    // the press each set their flag in the same masked window that zeroes
+    // the setpoints and on-times, so a frame either lands before it (a mode
+    // it set is kept, its setpoints and duties are then zeroed) or sees it
+    // and is refused.
+    const uint8_t hold = hold_refuse_reason();
+    if (hold != 0)
     {
-        (void)crumbs_refuse(ctx, BREAD_REFUSE_WATCHDOG_TRIP);
+        (void)crumbs_refuse(ctx, hold);
         return;
     }
 
@@ -346,5 +364,5 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
     (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1,
                                  RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG |
                                      RLHT_CAP_CLEAR_WATCHDOG_TRIP | RLHT_CAP_ESTOP_COUNT |
-                                     RLHT_CAP_REFUSES);
+                                     RLHT_CAP_REFUSES | RLHT_CAP_ESTOP_HOLD);
 }
