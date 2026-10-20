@@ -79,6 +79,12 @@ reads the hold's reason. The serial `R1PERIOD=`/`R2PERIOD=` commands
 still clamp a period to the same range. Every valid frame refreshes the
 watchdog, a refused one included.
 
+The firmware declares its type (`RLHT_TYPE_ID`) to CRUMBS, so a frame typed
+for another family is rejected before any handler runs: GET_ACK reports it
+rejected with `CRUMBS_ACK_REJECT_TYPE`, and it does not refresh the
+watchdog. Frames of type `0x00` are accepted. GET_ACK replies carry type
+`0x01`.
+
 ## Hardware e-stop
 
 The e-stop input is D2 with the internal pull-up; a press pulls it LOW. The

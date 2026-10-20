@@ -333,6 +333,10 @@ void setupSlice()
     Serial.begin(115200);
 
     crumbs_arduino_init_peripheral(&ctx, I2C_ADR);
+    // CRUMBS rejects a frame typed for another family before any handler
+    // runs: the families' opcodes overlap, so one misaddressed would
+    // otherwise be acted on as an RLHT command. Type 0x00 still matches.
+    crumbs_set_type_id(&ctx, RLHT_TYPE_ID);
     crumbs_set_callbacks(&ctx, on_crumbs_message, nullptr, nullptr);
 
     rc = crumbs_register_handler(&ctx, RLHT_OP_SET_MODE, handler_set_mode, nullptr);
