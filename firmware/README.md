@@ -69,7 +69,7 @@ from bread-crumbs-contracts `bread_refuse.h`. GET_CAPS advertises
 | `BREAD_REFUSE_WATCHDOG_TRIP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a trip is held |
 | `BREAD_REFUSE_UNDEFINED_VALUE` | SET_MODE other than open or closed loop; SET_TC_SELECT with a channel other than 1 or 2; SET_PERIODS outside `RLHT_PERIOD_MIN_MS`-`RLHT_PERIOD_MAX_MS` (100-10000 ms); SET_OPEN_DUTY above `RLHT_OPEN_DUTY_MAX_PCT` (100 %) |
 | `BREAD_REFUSE_WRONG_MODE` | SET_OPEN_DUTY outside open loop |
-| `BREAD_REFUSE_UNKNOWN_OP` | an opcode neither RLHT nor bread-common defines |
+| `BREAD_REFUSE_UNKNOWN_OP` | an opcode that is not an RLHT or bread-common command, including a GET opcode sent as a command frame instead of through SET_REPLY |
 
 A SET_TC_SELECT, SET_PERIODS or SET_OPEN_DUTY with one channel out of
 range still sets the other channel, then refuses. GET_STATE shows what took
@@ -78,6 +78,12 @@ SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY sent while tripped or e-stopped
 reads the hold's reason. The serial `R1PERIOD=`/`R2PERIOD=` commands
 still clamp a period to the same range. Every valid frame refreshes the
 watchdog, a refused one included.
+
+The firmware declares its type (`RLHT_TYPE_ID`) to CRUMBS, so a frame typed
+for another family is rejected before any handler runs: GET_ACK reports it
+rejected with `CRUMBS_ACK_REJECT_TYPE`, and it does not refresh the
+watchdog. Frames of type `0x00` are accepted. GET_ACK replies carry type
+`0x01`.
 
 ## Hardware e-stop
 
