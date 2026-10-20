@@ -70,6 +70,7 @@ extern volatile uint8_t estopCount;
 void setupSlice();
 void setupRLHT();
 void pollEStop();
+void updateStatusLed();
 void processEStop(bool pressed);
 void watchdogLogic();
 void measureThermocouples();
