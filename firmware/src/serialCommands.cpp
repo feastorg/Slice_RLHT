@@ -25,15 +25,22 @@ static void strupper(char *s)
         *s = toupper((unsigned char)*s);
 }
 
-// Mode, setpoint and on-time commands are ignored while the watchdog is
-// tripped, as their CRUMBS counterparts are: nothing sent during a trip is
-// stored and acted on when it is cleared.
-static bool refuse_while_tripped()
+// Mode, setpoint and on-time commands are ignored while the e-stop is held
+// or the watchdog is tripped, as their CRUMBS counterparts are refused:
+// nothing sent during a hold is stored and acted on when it ends.
+static bool refuse_while_held()
 {
-    if (!wdTripped)
-        return false;
-    Serial.println(F("Ignored: watchdog tripped, send WDCLEAR first"));
-    return true;
+    if (slice.eStop)
+    {
+        Serial.println(F("Ignored: e-stop held, release it first"));
+        return true;
+    }
+    if (wdTripped)
+    {
+        Serial.println(F("Ignored: watchdog tripped, send WDCLEAR first"));
+        return true;
+    }
+    return false;
 }
 
 static void processCommand(char *cmd)
@@ -59,7 +66,7 @@ static void processCommand(char *cmd)
 
     if (starts_with_P(cmd, PSTR("MODE=")))
     {
-        if (refuse_while_tripped())
+        if (refuse_while_held())
             return;
         char *mode = (char *)after_prefix_P(cmd, PSTR("MODE="));
         strupper(mode);
@@ -88,7 +95,7 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R1TEMP=")))
     {
-        if (refuse_while_tripped())
+        if (refuse_while_held())
             return;
         if (slice.mode == CLOSED_LOOP)
         {
@@ -111,7 +118,7 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R2TEMP=")))
     {
-        if (refuse_while_tripped())
+        if (refuse_while_held())
             return;
         if (slice.mode == CLOSED_LOOP)
         {
@@ -134,7 +141,7 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R1TIME=")))
     {
-        if (refuse_while_tripped())
+        if (refuse_while_held())
             return;
         if (slice.mode == OPEN_LOOP)
         {
@@ -160,7 +167,7 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R2TIME=")))
     {
-        if (refuse_while_tripped())
+        if (refuse_while_held())
             return;
         if (slice.mode == OPEN_LOOP)
         {

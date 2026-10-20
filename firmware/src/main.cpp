@@ -492,9 +492,9 @@ void processEStop(bool pressed)
         interrupts();
 
         relaysLow();
-        // A setpoint sent while the e-stop is held is still stored, and the
-        // loop skips computeHeater() until release, so it may never see this
-        // one at 0: drop the integral now.
+        // The loop skips computeHeater() while the e-stop is held, so it may
+        // never see these setpoints at 0: drop the integral now, so heating
+        // restarts from 0 when a setpoint returns after the release.
         relay1PID.SetMode(MANUAL);
         relay2PID.SetMode(MANUAL);
         pidOutput1 = 0;

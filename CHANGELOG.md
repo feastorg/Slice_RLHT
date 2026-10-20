@@ -41,9 +41,10 @@ This project did not use formal release tags through most of its history, so thi
   instead of 1205, as for a CRUMBS 0.16 build.
 - Requires CRUMBS `^0.16.0` and `bread-crumbs-contracts` `^0.8.0`
   (`firmware/platformio.ini`), for CRUMBS 0.16.0's SET acknowledgement.
-- Requires bread-crumbs-contracts `^0.9.0` (`firmware/platformio.ini` and
-  `slice.yaml`), for `bread_refuse.h`, `RLHT_CAP_REFUSES` and the
-  `RLHT_PERIOD_*`/`RLHT_OPEN_DUTY_MAX_PCT` ranges.
+- Requires bread-crumbs-contracts `^0.10.0` (`firmware/platformio.ini` and
+  `slice.yaml`), for `bread_refuse.h`, `RLHT_CAP_REFUSES`, the
+  `RLHT_PERIOD_*`/`RLHT_OPEN_DUTY_MAX_PCT` ranges and
+  `RLHT_CAP_ESTOP_HOLD`.
 - The default I2C address is now 19 (0x13), was 10 (0x0A). 0x0A is in
   the SMBus range 0x08-0x0B that CRUMBS's `docs/protocol.md` says to
   avoid (#12). A board flashed without `-DI2C_ADR` answers at 0x13, so
@@ -51,6 +52,16 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **Commands sent while the e-stop is held no longer heat at the release**
+  (#37). The press zeroed the setpoints and on-times, but SET_MODE,
+  SET_SETPOINTS and SET_OPEN_DUTY sent during the hold were stored, so
+  releasing the line heated to them. While the line is held they are now
+  refused with `BREAD_REFUSE_ESTOP`, which wins over
+  `BREAD_REFUSE_WATCHDOG_TRIP` when both holds are in force, and the serial
+  `MODE=`, `R*TEMP=` and `R*TIME=` are ignored the same way. A release
+  heats nothing; resume by sending setpoints or duties. GET_CAPS advertises
+  `RLHT_CAP_ESTOP_HOLD`, so the contracts pin moves to `^0.10.0`
+  (`firmware/platformio.ini` and `slice.yaml`).
 - **An edge train on the e-stop line can no longer postpone the stop**
   (#29). The debounce restarted on every edge, so edges less than 25 ms
   apart kept the e-stop from asserting for as long as they lasted, whatever

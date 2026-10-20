@@ -60,11 +60,12 @@ on-time of 0.
 A SET the firmware does not act on in full is refused with
 `crumbs_refuse()`, so CRUMBS's GET_ACK reports it refused, with a reason
 from bread-crumbs-contracts `bread_refuse.h`. GET_CAPS advertises
-`RLHT_CAP_REFUSES`.
+`RLHT_CAP_REFUSES` and `RLHT_CAP_ESTOP_HOLD`.
 
 | Reason | When |
 | --- | --- |
 | `BREAD_REFUSE_MALFORMED` | the payload does not unpack; SET_WATCHDOG lacks its u16; CLEAR_WATCHDOG_TRIP carries a payload |
+| `BREAD_REFUSE_ESTOP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while the hardware e-stop is held; this reason wins when a watchdog trip is held too |
 | `BREAD_REFUSE_WATCHDOG_TRIP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a trip is held |
 | `BREAD_REFUSE_UNDEFINED_VALUE` | SET_MODE other than open or closed loop; SET_TC_SELECT with a channel other than 1 or 2; SET_PERIODS outside `RLHT_PERIOD_MIN_MS`-`RLHT_PERIOD_MAX_MS` (100-10000 ms); SET_OPEN_DUTY above `RLHT_OPEN_DUTY_MAX_PCT` (100 %) |
 | `BREAD_REFUSE_WRONG_MODE` | SET_OPEN_DUTY outside open loop |
@@ -72,8 +73,37 @@ from bread-crumbs-contracts `bread_refuse.h`. GET_CAPS advertises
 
 A SET_TC_SELECT, SET_PERIODS or SET_OPEN_DUTY with one channel out of
 range still sets the other channel, then refuses. GET_STATE shows what took
-effect. A trip is checked before the payload is unpacked, so a malformed
-SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY sent while tripped reads
-`BREAD_REFUSE_WATCHDOG_TRIP`. The serial `R1PERIOD=`/`R2PERIOD=` commands
+effect. A hold is checked before the payload is unpacked, so a malformed
+SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY sent while tripped or e-stopped
+reads the hold's reason. The serial `R1PERIOD=`/`R2PERIOD=` commands
 still clamp a period to the same range. Every valid frame refreshes the
 watchdog, a refused one included.
+
+## Hardware e-stop
+
+The e-stop input is D2 with the internal pull-up; a press pulls it LOW. The
+firmware samples it on every loop pass and through the 1 s boot wait. The
+first LOW sample asserts the e-stop, and release needs the line HIGH for
+25 ms without a LOW sample in between, so a chattering line stays stopped.
+A LOW glitch that a loop pass samples, such as noise on an unpressed line,
+asserts the e-stop too.
+
+A press holds the way a watchdog trip does (`RLHT_CAP_ESTOP_HOLD`): the
+relays go off, both setpoints and open-loop on-times go to 0, and both PIDs
+drop to manual. While the e-stop is held, `SET_MODE`, `SET_SETPOINTS` and
+`SET_OPEN_DUTY` are refused with `BREAD_REFUSE_ESTOP`, and the serial
+`MODE=`, `R1TEMP=`/`R2TEMP=` and `R1TIME=`/`R2TIME=` are ignored with a
+message. PID gains, periods, thermocouple selection and the watchdog stay
+available. `GET_STATE` shows the e-stop flag, and `estop_count` counts the
+press.
+
+Releasing the e-stop heats nothing: the controller resumes by sending
+setpoints or duties.
+
+The firmware hold is the only stop on gen1 boards, which have no hardware
+cut of heater power on the e-stop line. Check a later board's schematic
+before relying on a hardware cut. An e-stop that cuts the supply instead
+reboots the slice with setpoints at 0; power the Nano from the switched
+supply too, since a Nano kept alive over USB sees no stop.
+bread-crumbs-contracts `docs/controller-compatibility.md` covers both
+wirings.
