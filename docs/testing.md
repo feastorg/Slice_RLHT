@@ -5,19 +5,19 @@ description: "Hardware and firmware testing checklist and procedures."
 
 Testing procedures for this Slice. Covers manual validation and optional automated checks.
 
-## ✅ Hardware Checklist
+## Hardware Checklist
 
 - [ ] Visual inspection (solder joints, polarity, orientation)
 - [ ] No shorts across power rails
 - [ ] All headers and connectors populated
 
-## ⚡ Power-On Verification
+## Power-On Verification
 
 1. Apply logic power (e.g., 5V).
 2. Confirm LED heartbeat (if present).
 3. Measure voltage rails at test points.
 
-## 📟 Functional Tests
+## Functional Tests
 
 | Test        | Method                            | Expected Result                     |
 | ----------- | --------------------------------- | ----------------------------------- |
@@ -25,7 +25,7 @@ Testing procedures for this Slice. Covers manual validation and optional automat
 | Input test  | Drive digital/PWM input           | MCU registers or reacts accordingly |
 | Output test | Scope or multimeter at output pin | Output toggles or changes as coded  |
 
-## 🔁 Firmware Regression (if present)
+## Firmware Regression (if present)
 
 ```bash
 pio run -t test
@@ -36,6 +36,6 @@ pio run -t test
 Each bench session on real hardware is written up in [`bench/`](bench/README.md),
 with a table of all records there.
 
-## 📷 Test Setup
+## Test Setup
 
 <!-- insert annotated image of bench setup under docs/assets/ and insert here -->
