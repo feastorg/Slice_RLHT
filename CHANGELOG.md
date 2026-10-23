@@ -8,6 +8,12 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Added
 
+- **Host tests** in `firmware/test/host`: the firmware's own sources built
+  against the real CRUMBS core, the contracts headers and PID_v1, with the
+  Arduino core, FastLED and the MAX6675 driver stubbed, once per PlatformIO
+  env. They cover command dispatch, the e-stop hold, the watchdog trip and the
+  boot status LED. CI runs them beside the four builds. They gate the move
+  onto bread-slice-core (feastorg/.github#4).
 - **Bench records** in `docs/bench/`: one file per session on real
   hardware, indexed in `docs/bench/README.md`, following bread-infra's
   `spec/slice/bench-records.md`. The first is a backfill of the 2026-10-20
