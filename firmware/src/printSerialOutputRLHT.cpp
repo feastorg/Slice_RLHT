@@ -46,17 +46,15 @@ void printSliceState(Print &out)
     out.print(F(", Thermo Select Relay 2:"));
     out.print(slice.relayHeater2.thermocoupleSelect);
     out.print(F(", ESTOP:"));
-    out.print(slice.eStop);
+    out.print(estopInput.asserted());
 
     out.print(F(", WDOG:"));
     uint16_t wdTimeout;
     bool wdTrip;
     uint8_t wdTrips;
-    noInterrupts();
-    wdTimeout = wdTimeoutMs;
-    wdTrip = wdTripped;
-    wdTrips = wdTripCount;
-    interrupts();
+    wdTimeout = commandWatchdog.timeoutMs();
+    wdTrip = commandWatchdog.tripped();
+    wdTrips = commandWatchdog.tripCount();
     if (wdTimeout == 0)
         out.print(F("off"));
     else

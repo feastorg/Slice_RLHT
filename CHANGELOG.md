@@ -34,6 +34,20 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Changed
 
+- **The e-stop input, command watchdog and status LED come from
+  bread-slice-core 0.1** (feastorg/.github#4). `bsc::EStop`,
+  `bsc::bootWait()`, `bsc::CommandWatchdog` and `bsc::StatusLed` replace
+  `pollEStop()`, the `wd*` globals, `slice.eStop`, `estopCount` and FastLED.
+  The sampling, debounce, latch and colours are unchanged; what a press or a
+  trip does stays here. Two differences: the boot wait restamps the watchdog
+  when it ends, so an `RLHT_WATCHDOG_BOOT_MS` under a second no longer trips
+  on the first loop pass, and the watchdog's timeout comparison runs inside
+  the window that sets the latch.
+
+  FastLED is gone from `lib_deps`. Gen2 flash drops by 2796 to 2897 B and
+  RAM by 153 to 259 B. Gen1 has no LED; it grows by 232 to 252 B of flash
+  and 3 to 5 B of RAM for the core's e-stop and watchdog, which keep the
+  pin, polarity and debounce as members where the old code had constants.
 - The PlatformIO platforms are pinned: `platformio/atmelavr @ 5.3.0` and
   `platformio/atmelmegaavr @ 1.10.0`, the versions local builds and CI
   already resolved. Before, a clean build took whatever platform release

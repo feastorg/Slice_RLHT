@@ -2,7 +2,7 @@
 #define GLOBALS_H
 
 #include <Arduino.h>
-#include <FastLED.h>
+#include <bread_slice_core.h>
 #include <crumbs.h>
 #include <PID_v1.h>
 #include <max6675.h>
@@ -34,7 +34,6 @@ struct RLHT_SLICE
     double temperature2 = NAN;
     RelayHeater relayHeater1;
     RelayHeater relayHeater2;
-    bool eStop = false;
     ControlMode mode = CLOSED_LOOP;
     bool relay1State = false;
     bool relay2State = false;
@@ -48,7 +47,6 @@ struct Timing
     unsigned long relay2Start;
 };
 
-extern CRGB led;
 extern RLHT_SLICE slice;
 extern Timing timing;
 extern PID relay1PID;
@@ -57,21 +55,17 @@ extern PID relay2PID;
 // Command watchdog (BREAD_OP_SET/GET/CLEAR_WATCHDOG*): boots disarmed
 // (timeout 0) unless RLHT_WATCHDOG_BOOT_MS is defined. A trip latches until
 // CLEAR_WATCHDOG_TRIP, the serial WDCLEAR command, or a reboot; mode,
-// setpoint and duty commands are ignored while it is set. ISR handlers
-// write these; main-loop access goes through short masked windows
-// (multi-byte volatiles on AVR).
-extern volatile uint16_t wdTimeoutMs;
-extern volatile unsigned long wdLastRxMs;
-extern volatile bool wdTripped;
-extern volatile uint8_t wdTripCount;
-// Hardware e-stop presses since boot, wraps at 255 (RLHT_CAP_ESTOP_COUNT).
-extern volatile uint8_t estopCount;
+// setpoint and duty commands are ignored while it is set. From
+// bread-slice-core: arm(), stamp() and clear() are ISR-safe.
+extern bsc::CommandWatchdog commandWatchdog;
+// The e-stop input (pin ESTOP): asserted() and count(), the latter for
+// RLHT_CAP_ESTOP_COUNT, are what the I2C handlers read.
+extern bsc::EStop estopInput;
 
 void setupSlice();
 void setupRLHT();
-void pollEStop();
 void updateStatusLed();
-void processEStop(bool pressed);
+void processEStop(bsc::EStop::Event e);
 void watchdogLogic();
 void measureThermocouples();
 void relayControlLogic();

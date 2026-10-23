@@ -22,10 +22,6 @@ extern int host_pin_level[32];
 extern float host_tc1_celsius;
 extern float host_tc2_celsius;
 
-// Every colour the status LED was shown, in order (CRGB::Col values).
-extern int host_led_shown[64];
-extern int host_led_shows;
-
 // The context setup() passed to crumbs_arduino_init_peripheral(), or null.
 extern crumbs_context_t *host_ctx;
 

@@ -4,13 +4,14 @@ The firmware's own sources (`firmware/src`), built with the host C++ compiler
 and run on the host. Nothing is reimplemented:
 
 - **Real:** `main.cpp`, `rlht_handlers.cpp`, `serialCommands.cpp`, the CRUMBS
-  core, the contracts headers and `PID_v1`. These come from PlatformIO's
-  libdeps, so they are the versions the firmware builds with.
-- **Stubbed** (`stubs/`): the Arduino core, the AVR watchdog, FastLED and the
-  MAX6675 driver. `digitalWrite()` records each pin's level
-  (`host_pin_level`), so a test reads the relays; the MAX6675 stub returns
-  `host_tc1_celsius` and `host_tc2_celsius`; the FastLED stub records every
-  colour shown.
+  core, the contracts headers, `PID_v1` and bread-slice-core. These come from
+  PlatformIO's libdeps, so they are the versions the firmware builds with.
+  bread-slice-core is built with `BSC_HOST_TEST`, so its status LED records
+  the last frame (`bsc_host_led_frame`) instead of sending it.
+- **Stubbed** (`stubs/`): the Arduino core, the AVR watchdog and the MAX6675
+  driver. `digitalWrite()` records each pin's level (`host_pin_level`), so a
+  test reads the relays; the MAX6675 stub returns `host_tc1_celsius` and
+  `host_tc2_celsius`.
 
 Frames go in through `crumbs_peripheral_handle_receive()` and replies come
 back through `crumbs_peripheral_build_reply()`, the two calls the I2C
@@ -21,7 +22,7 @@ including GET_ACK.
 
 ```sh
 cd firmware
-pio pkg install -e gen2_nano   # once, for CRUMBS, the contracts and PID
+pio pkg install -e gen2_nano   # once, for the libraries in libdeps
 make -C test/host
 ```
 

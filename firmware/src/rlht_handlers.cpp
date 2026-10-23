@@ -33,9 +33,9 @@ static double deci_c_to_temp(int16_t t)
 // clearing the trip does not lift the e-stop hold.
 static uint8_t hold_refuse_reason()
 {
-    if (slice.eStop)
+    if (estopInput.asserted())
         return BREAD_REFUSE_ESTOP;
-    if (wdTripped)
+    if (commandWatchdog.tripped())
         return BREAD_REFUSE_WATCHDOG_TRIP;
     return 0;
 }
@@ -55,8 +55,7 @@ void handler_set_watchdog(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *
     // Arms, re-arms or disarms (0) and stamps liveness. It does not clear a
     // latched trip: re-arming is safe to send while tripped, and releasing
     // the hold is a separate, explicit act (handler_clear_watchdog_trip).
-    wdTimeoutMs = timeout_ms;
-    wdLastRxMs = millis();
+    commandWatchdog.arm(timeout_ms, millis());
 }
 
 void handler_clear_watchdog_trip(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
@@ -81,20 +80,20 @@ void handler_clear_watchdog_trip(crumbs_context_t *ctx, uint8_t opcode, const ui
     // nothing: SET_MODE, SET_SETPOINTS and SET_OPEN_DUTY were ignored during
     // the trip, so the setpoints and on-times it zeroed are still 0, and
     // nothing heats until a new setpoint or duty arrives.
-    wdTripped = false;
+    commandWatchdog.clear();
 }
 
 void reply_get_watchdog(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
 {
-    uint16_t timeout_ms = wdTimeoutMs;
+    uint16_t timeout_ms = commandWatchdog.timeoutMs();
     (void)ctx;
     (void)user_data;
 
     (void)bread_watchdog_build_reply(reply, RLHT_TYPE_ID,
                                      timeout_ms != 0 ? 1 : 0, timeout_ms,
-                                     wdTripped ? 1 : 0, wdTripCount);
+                                     commandWatchdog.tripped() ? 1 : 0, commandWatchdog.tripCount());
     // A reply build proves a live master too.
-    wdLastRxMs = millis();
+    commandWatchdog.stamp(millis());
 }
 
 void handler_set_mode(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
@@ -287,7 +286,7 @@ void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_da
     (void)user_data;
     // Every reply build proves a live master (SET_REPLY staging frames are
     // not dispatched to on_message, so this is where poll traffic stamps).
-    wdLastRxMs = millis();
+    commandWatchdog.stamp(millis());
     crumbs_build_version_reply(reply, RLHT_TYPE_ID, RLHT_MODULE_VER_MAJOR, RLHT_MODULE_VER_MINOR, RLHT_MODULE_VER_PATCH);
 }
 
@@ -300,13 +299,13 @@ void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_
     uint16_t on2 = 0;
 
     // The controller's periodic state poll is the primary liveness signal.
-    wdLastRxMs = millis();
+    commandWatchdog.stamp(millis());
     double on1d = 0.0;
     double on2d = 0.0;
     (void)ctx;
     (void)user_data;
 
-    if (slice.eStop)
+    if (estopInput.asserted())
         flags |= RLHT_FLAG_ESTOP;
     if (slice.relay1State)
         flags |= RLHT_FLAG_RELAY1_ON;
@@ -352,7 +351,7 @@ void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_
     (void)rlht_state_pack(reply, &s);
     // RLHT_CAP_ESTOP_COUNT: append estop_count at RLHT_STATE_OFF_ESTOP_COUNT,
     // making the reply 20 bytes (rlht_state_pack writes the first 19).
-    (void)crumbs_msg_add_u8(reply, estopCount);
+    (void)crumbs_msg_add_u8(reply, estopInput.count());
 }
 
 void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
@@ -360,7 +359,7 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
     (void)ctx;
     (void)user_data;
 
-    wdLastRxMs = millis();
+    commandWatchdog.stamp(millis());
     (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1,
                                  RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG |
                                      RLHT_CAP_CLEAR_WATCHDOG_TRIP | RLHT_CAP_ESTOP_COUNT |
