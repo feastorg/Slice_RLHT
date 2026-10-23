@@ -30,12 +30,12 @@ static void strupper(char *s)
 // nothing sent during a hold is stored and acted on when it ends.
 static bool refuse_while_held()
 {
-    if (slice.eStop)
+    if (estopInput.asserted())
     {
         Serial.println(F("Ignored: e-stop held, release it first"));
         return true;
     }
-    if (wdTripped)
+    if (commandWatchdog.tripped())
     {
         Serial.println(F("Ignored: watchdog tripped, send WDCLEAR first"));
         return true;
@@ -60,9 +60,7 @@ static void processCommand(char *cmd)
     // A serial operator is a live master too: feed the command watchdog.
     // Only WDCLEAR clears a trip; any other line, a logger's included,
     // leaves the hold latched.
-    noInterrupts();
-    wdLastRxMs = millis();
-    interrupts();
+    commandWatchdog.stamp(millis());
 
     if (starts_with_P(cmd, PSTR("MODE=")))
     {
@@ -341,10 +339,7 @@ static void processCommand(char *cmd)
         if (v > 65535)
             v = 65535;
         // Re-arms without clearing a trip, as SET_WATCHDOG does.
-        noInterrupts();
-        wdTimeoutMs = (uint16_t)v;
-        wdLastRxMs = millis();
-        interrupts();
+        commandWatchdog.arm((uint16_t)v, millis());
         Serial.print(F("WDOG-> "));
         if (v == 0)
             Serial.println(F("disarmed"));
@@ -359,9 +354,7 @@ static void processCommand(char *cmd)
         // The local operator's clear, as CLEAR_WATCHDOG_TRIP: the trip and
         // nothing else. Mode, setpoint and on-time commands were ignored
         // during the trip, so nothing heats until new ones are sent.
-        noInterrupts();
-        wdTripped = false;
-        interrupts();
+        commandWatchdog.clear();
         Serial.println(F("WDOG trip cleared"));
     }
     else if (starts_with_P(cmd, PSTR("HELP")) || starts_with_P(cmd, PSTR("?")))

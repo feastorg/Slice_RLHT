@@ -4,7 +4,6 @@
 #include <cstdio>
 
 HardwareSerial Serial;
-FastLEDStub FastLED;
 
 unsigned long host_now = 0;
 int host_estop_level = HIGH;
@@ -12,8 +11,6 @@ int host_pin_level[32] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
                           -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 float host_tc1_celsius = 25.0f;
 float host_tc2_celsius = 25.0f;
-int host_led_shown[64];
-int host_led_shows = 0;
 crumbs_context_t *host_ctx = nullptr;
 
 unsigned long millis() { return host_now; }
@@ -36,13 +33,6 @@ int digitalRead(uint8_t pin)
 float host_thermocouple_celsius(int8_t cs)
 {
     return cs == TC_CS1 ? host_tc1_celsius : host_tc2_celsius;
-}
-
-void FastLEDStub::show()
-{
-    if (host_led_shows < 64)
-        host_led_shown[host_led_shows] = led.c;
-    host_led_shows++;
 }
 
 extern "C" void crumbs_arduino_init_peripheral(crumbs_context_t *ctx, uint8_t address)

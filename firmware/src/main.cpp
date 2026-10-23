@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <FastLED.h>
 #include <PID_v1.h>
 #include <max6675.h>
 
@@ -15,21 +14,21 @@
 #include "config.h"
 #include "config_hardware.h"
 #include "globals.h"
+#if RLHT_HAS_STATUS_LED
+#include <bsc_status_led.h>
+#endif
 
 static crumbs_context_t ctx;
-CRGB led;
+#if RLHT_HAS_STATUS_LED
+#if LED_PIN != 5
+#error "bread-slice-core's status LED driver writes D5"
+#endif
+static bsc::StatusLed statusLed;
+#endif
 
-// Command watchdog state (see globals.h). ISR-written; main loop snapshots
-// under short masked windows.
-volatile uint16_t wdTimeoutMs = 0;
-volatile unsigned long wdLastRxMs = 0;
-volatile bool wdTripped = false;
-volatile uint8_t wdTripCount = 0;
-volatile uint8_t estopCount = 0;
-
-static const unsigned long ESTOP_DEBOUNCE_MS = 25;
-static bool estopReleasePending = false;
-static unsigned long estopReleaseStartMs = 0;
+// Active LOW with the internal pull-up; release after 25 ms high.
+bsc::EStop estopInput(ESTOP);
+bsc::CommandWatchdog commandWatchdog;
 
 RLHT_SLICE slice;
 Timing timing = {0};
@@ -219,23 +218,23 @@ void setup()
     // e-stop: no external bias resistor on current boards, so use the internal
     // pull-up. Enable it first, so it has the rest of setup to charge the
     // line before the first sample below.
-    pinMode(ESTOP, INPUT_PULLUP);
+    estopInput.begin();
     setupSlice();
     setupRLHT();
     // I2C is live from setupSlice(), so sample the e-stop through the boot
     // second instead of sleeping: a line held at power-up, or pressed now,
     // is asserted before loop() runs. The status LED stays blue through it;
-    // loop() shows the e-stop state from its first pass.
-    const unsigned long bootStartMs = millis();
-    while (millis() - bootStartMs < 1000)
-        pollEStop();
+    // loop() shows the e-stop state from its first pass. The wait restamps
+    // the command watchdog when it ends, so an RLHT_WATCHDOG_BOOT_MS under a
+    // second does not trip on the first pass.
+    bsc::bootWait(estopInput, 1000, processEStop, &commandWatchdog);
     wdt_enable(WDTO_1S);
 }
 
 void loop()
 {
     wdt_reset();
-    pollEStop();
+    processEStop(estopInput.poll(millis()));
     updateStatusLed();
     watchdogLogic();
     measureThermocouples();
@@ -282,35 +281,25 @@ static bool is_command_op(uint8_t opcode)
 
 static void on_crumbs_message(crumbs_context_t *c, const crumbs_message_t *msg)
 {
-    wdLastRxMs = millis();
+    commandWatchdog.stamp(millis());
     if (!is_command_op(msg->opcode))
         (void)crumbs_refuse(c, BREAD_REFUSE_UNKNOWN_OP);
 }
 
 void watchdogLogic()
 {
-    uint16_t timeout;
-    unsigned long lastRx;
-    bool tripped;
-
-    noInterrupts();
-    timeout = wdTimeoutMs;
-    lastRx = wdLastRxMs;
-    tripped = wdTripped;
-    interrupts();
-
-    if (timeout == 0 || tripped)
-        return;  // relayControlLogic holds relays LOW while tripped
-
-    if (millis() - lastRx < timeout)
+    // True once, on the pass that trips: armed, not already tripped (the
+    // relayControlLogic hold keeps the relays LOW while it is), and silent
+    // for the timeout. commandWatchdog has latched the trip with interrupts
+    // off before it returns, so the I2C handlers already refuse heating
+    // commands.
+    if (!commandWatchdog.check(millis()))
         return;
 
     relaysLow();
 
-    // Same safe-state fields as processEStop, without touching eStop.
+    // Same safe-state fields as processEStop.
     noInterrupts();
-    wdTripped = true;
-    wdTripCount++;
     slice.relayHeater1.setpointTemperature = 0;
     slice.relayHeater2.setpointTemperature = 0;
     slice.relayHeater1.relayOnTime = 0;
@@ -392,15 +381,12 @@ void setupSlice()
 #ifdef RLHT_WATCHDOG_BOOT_MS
     // Integration opt-in: come up armed (e.g. e-stop wirings that power-cycle
     // the board). Default builds boot disarmed.
-    wdTimeoutMs = (uint16_t)RLHT_WATCHDOG_BOOT_MS;
-    wdLastRxMs = millis();
+    commandWatchdog.arm((uint16_t)RLHT_WATCHDOG_BOOT_MS, millis());
 #endif
 
 #if RLHT_HAS_STATUS_LED
-    FastLED.addLeds<NEOPIXEL, LED_PIN>(&led, 1);
-    FastLED.setBrightness(50);
-    led = CRGB::Blue;
-    FastLED.show();
+    statusLed.begin();
+    statusLed.set(bsc::StatusLed::Boot);
 #endif
 
     SLICE_DEBUG_PRINTLN(F("RLHT SLICE INITIALIZED"));
@@ -447,68 +433,34 @@ void setupRLHT()
     timing.relay2Start = millis();
 }
 
-// The line is sampled on every pass, not edge-triggered. The first LOW
-// sample asserts the e-stop, so bounce or an edge train cannot postpone a
-// stop (#29); release needs the line HIGH for ESTOP_DEBOUNCE_MS without a
-// single LOW sample.
-void pollEStop()
-{
-    // Internal pull-up means asserted e-stop pulls the line LOW.
-    if (digitalRead(ESTOP) == LOW)
-    {
-        estopReleasePending = false;
-        if (!slice.eStop)
-            processEStop(true);
-    }
-    else if (slice.eStop)
-    {
-        if (!estopReleasePending)
-        {
-            estopReleasePending = true;
-            estopReleaseStartMs = millis();
-        }
-        else if (millis() - estopReleaseStartMs >= ESTOP_DEBOUNCE_MS)
-        {
-            estopReleasePending = false;
-            processEStop(false);
-        }
-    }
-}
-
-// Red while the e-stop is held, green otherwise, written only on a change.
-// Called from loop() only. The boot wait in setup() polls the e-stop too, and
-// when pollEStop() wrote the LED, its first pass replaced the boot blue
+// Red while the e-stop is held, green otherwise; StatusLed writes only on a
+// change. Called from loop() only. The boot wait in setup() polls the e-stop
+// too, and when that wrote the LED, its first pass replaced the boot blue
 // within microseconds.
 void updateStatusLed()
 {
 #if RLHT_HAS_STATUS_LED
-    static CRGB lastLed = CRGB::Black;
-    CRGB next = slice.eStop ? CRGB::Red : CRGB::Green;
-    if (next != lastLed)
-    {
-        led = next;
-        FastLED.show();
-        lastLed = next;
-    }
+    statusLed.set(estopInput.asserted() ? bsc::StatusLed::EStop : bsc::StatusLed::Running);
 #endif
 }
 
-void processEStop(bool pressed)
+// The line is sampled every pass by estopInput.poll(), not edge-triggered.
+// The first LOW sample asserts the e-stop, so bounce or an edge train cannot
+// postpone a stop (#29); release needs the line HIGH for 25 ms without a
+// single LOW sample. By the time Pressed arrives here, estopInput has set
+// asserted() and counted the press with interrupts off, so the I2C handlers
+// already refuse heating commands.
+void processEStop(bsc::EStop::Event e)
 {
-    if (pressed)
+    if (e == bsc::EStop::Pressed)
     {
         noInterrupts();
-        // Count a new press only (released -> pressed). A line held at
-        // power-up counts as one press. Wraps at 255.
-        if (!slice.eStop)
-            estopCount++;
         slice.relayHeater1.setpointTemperature = 0;
         slice.relayHeater2.setpointTemperature = 0;
         slice.relayHeater1.relayOnTime = 0;
         slice.relayHeater2.relayOnTime = 0;
         slice.relay1State = false;
         slice.relay2State = false;
-        slice.eStop = true;
         interrupts();
 
         relaysLow();
@@ -522,11 +474,9 @@ void processEStop(bool pressed)
 
         SLICE_DEBUG_PRINTLN(F("ESTOP PRESSED!"));
     }
-    else
+    else if (e == bsc::EStop::Released)
     {
-        noInterrupts();
-        slice.eStop = false;
-        interrupts();
+        // Nothing heats: setpoints and on-times stay 0 until new ones arrive.
         SLICE_DEBUG_PRINTLN(F("ESTOP RELEASED!"));
     }
 }
@@ -553,7 +503,7 @@ void relayControlLogic()
     // one window so a heater's tunings are never torn; a torn view across
     // windows self-corrects next iteration.
     noInterrupts();
-    bool localEStop = slice.eStop || wdTripped;
+    bool localEStop = estopInput.asserted() || commandWatchdog.tripped();
     ControlMode localMode = slice.mode;
     double sp1 = slice.relayHeater1.setpointTemperature;
     double sp2 = slice.relayHeater2.setpointTemperature;
