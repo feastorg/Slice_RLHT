@@ -82,6 +82,11 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **A burst of serial input no longer holds the loop** (#39). The serial
+  reader handled every buffered line in one call, and each reply blocks
+  once the transmit buffer fills, so the e-stop went unsampled until the
+  whole burst was answered. It now handles one line per loop pass, and the
+  e-stop is sampled between lines, as Slice_DCMT does since its #49.
 - **The status LED shows blue through boot again** (gen2). Since the e-stop
   sampling change (#38), the 1 s boot wait polls the e-stop, and
   `pollEStop()` also wrote the LED, so its first pass turned the boot blue

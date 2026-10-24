@@ -38,6 +38,7 @@ the board. `make` exits non-zero if any check fails.
 | `test_dispatch.cpp` | Which frames are taken as commands: every opcode is swept, GET opcodes sent as commands are refused, queries answer through SET_REPLY, and another family's frame is rejected without arming or refreshing the watchdog (#36) |
 | `test_estop_hold.cpp` | An e-stop press during open-loop heating: GET_STATE reports it and its count, the relays go off and the on-times to 0, a SET is refused `ESTOP`, the release is debounced and heats nothing, and a second press counts (`RLHT_CAP_ESTOP_HOLD`) |
 | `test_watchdog_trip.cpp` | A command-watchdog trip: GET_WATCHDOG reports it, the relays go off, a SET is refused `WATCHDOG_TRIP`, a re-arm leaves it latched, and `CLEAR_WATCHDOG_TRIP` lifts it, keeps the count and heats nothing |
+| `test_serial_burst.cpp` | A burst of serial lines is answered one line per `loop()` pass, so an e-stop pressed mid-burst is asserted before the next line and the lines after it are refused (#39) |
 | `test_status_led.cpp` | Blue through the boot wait, then green or red on the first `loop()` pass, with the e-stop released or held from power-up; no LED driven on gen1 (#46) |
 
 ## Writing a test
