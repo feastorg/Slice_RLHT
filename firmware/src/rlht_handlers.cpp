@@ -172,7 +172,10 @@ void handler_set_pid(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data,
     (void)opcode;
     (void)user_data;
 
-    if (rlht_set_pid_unpack(data, data_len, &v) != 0)
+    // Exactly the wire size (rlht_set_pid_unpack alone accepts trailing
+    // bytes): a widened SET_PID would otherwise be read as these u8 x10
+    // gains and applied (#50).
+    if (data_len != rlht_set_pid_wire_size || rlht_set_pid_unpack(data, data_len, &v) != 0)
     {
         (void)crumbs_refuse(ctx, BREAD_REFUSE_MALFORMED);
         return;

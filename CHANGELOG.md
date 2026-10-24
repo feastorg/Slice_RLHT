@@ -82,6 +82,12 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **SET_PID takes exactly 6 bytes** (#50). `rlht_set_pid_unpack` accepts
+  trailing bytes, so a widened SET_PID, such as the u16 x1000 one
+  bread-crumbs-contracts#64 proposes, was read as u8 x10 gains and applied.
+  Any other length is now refused `MALFORMED` and changes no gain, as
+  Slice_DCMT's SET_PID does. The other SET handlers still take trailing
+  bytes, which the contracts keep as their extension path.
 - **Serial numbers are parsed strictly** (#51), with bread-slice-core's
   `parseLong()` and `parseFloat()`. The whole token must parse and be in
   range for its field, or the command is refused with no change.
