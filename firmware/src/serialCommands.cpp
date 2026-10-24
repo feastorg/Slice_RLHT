@@ -97,8 +97,8 @@ static void processCommand(char *cmd)
             return;
         if (slice.mode == CLOSED_LOOP)
         {
-            double value = atof(after_prefix_P(cmd, PSTR("R1TEMP=")));
-            if (value >= 0 && value <= 500)
+            float value;
+            if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1TEMP=")), 0.0f, 500.0f, &value))
             {
                 slice.relayHeater1.setpointTemperature = value;
                 Serial.print(F("Relay 1 setpoint: "));
@@ -120,8 +120,8 @@ static void processCommand(char *cmd)
             return;
         if (slice.mode == CLOSED_LOOP)
         {
-            double value = atof(after_prefix_P(cmd, PSTR("R2TEMP=")));
-            if (value >= 0 && value <= 500)
+            float value;
+            if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2TEMP=")), 0.0f, 500.0f, &value))
             {
                 slice.relayHeater2.setpointTemperature = value;
                 Serial.print(F("Relay 2 setpoint: "));
@@ -143,8 +143,8 @@ static void processCommand(char *cmd)
             return;
         if (slice.mode == OPEN_LOOP)
         {
-            double value = atof(after_prefix_P(cmd, PSTR("R1TIME=")));
-            if (value >= 0 && value <= slice.relayHeater1.relayPeriod)
+            float value;
+            if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1TIME=")), 0.0f, (float)slice.relayHeater1.relayPeriod, &value))
             {
                 slice.relayHeater1.relayOnTime = value;
                 Serial.print(F("R1 time: "));
@@ -169,8 +169,8 @@ static void processCommand(char *cmd)
             return;
         if (slice.mode == OPEN_LOOP)
         {
-            double value = atof(after_prefix_P(cmd, PSTR("R2TIME=")));
-            if (value >= 0 && value <= slice.relayHeater2.relayPeriod)
+            float value;
+            if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2TIME=")), 0.0f, (float)slice.relayHeater2.relayPeriod, &value))
             {
                 slice.relayHeater2.relayOnTime = value;
                 Serial.print(F("R2 time: "));
@@ -191,8 +191,8 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R1TC=")))
     {
-        long value = atol(after_prefix_P(cmd, PSTR("R1TC=")));
-        if (value == 1 || value == 2)
+        long value;
+        if (bsc::parseLong(after_prefix_P(cmd, PSTR("R1TC=")), 1, 2, &value))
         {
             slice.relayHeater1.thermocoupleSelect = (uint8_t)value;
             Serial.print(F("R1 TC: "));
@@ -205,8 +205,8 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R2TC=")))
     {
-        long value = atol(after_prefix_P(cmd, PSTR("R2TC=")));
-        if (value == 1 || value == 2)
+        long value;
+        if (bsc::parseLong(after_prefix_P(cmd, PSTR("R2TC=")), 1, 2, &value))
         {
             slice.relayHeater2.thermocoupleSelect = (uint8_t)value;
             Serial.print(F("R2 TC: "));
@@ -219,8 +219,8 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R1KP=")))
     {
-        double value = atof(after_prefix_P(cmd, PSTR("R1KP=")));
-        if (value >= 0)
+        float value;
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1KP=")), 0.0f, 25.5f, &value))
         {
             slice.relayHeater1.Kp = value;
             Serial.print(F("R1 Kp: "));
@@ -228,13 +228,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Kp must be >= 0"));
+            Serial.println(F("Kp must be 0 to 25.5"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R1KI=")))
     {
-        double value = atof(after_prefix_P(cmd, PSTR("R1KI=")));
-        if (value >= 0)
+        float value;
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1KI=")), 0.0f, 25.5f, &value))
         {
             slice.relayHeater1.Ki = value;
             Serial.print(F("R1 Ki: "));
@@ -242,13 +242,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Ki must be >= 0"));
+            Serial.println(F("Ki must be 0 to 25.5"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R1KD=")))
     {
-        double value = atof(after_prefix_P(cmd, PSTR("R1KD=")));
-        if (value >= 0)
+        float value;
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1KD=")), 0.0f, 25.5f, &value))
         {
             slice.relayHeater1.Kd = value;
             Serial.print(F("R1 Kd: "));
@@ -256,13 +256,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Kd must be >= 0"));
+            Serial.println(F("Kd must be 0 to 25.5"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R2KP=")))
     {
-        double value = atof(after_prefix_P(cmd, PSTR("R2KP=")));
-        if (value >= 0)
+        float value;
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2KP=")), 0.0f, 25.5f, &value))
         {
             slice.relayHeater2.Kp = value;
             Serial.print(F("R2 Kp: "));
@@ -270,13 +270,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Kp must be >= 0"));
+            Serial.println(F("Kp must be 0 to 25.5"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R2KI=")))
     {
-        double value = atof(after_prefix_P(cmd, PSTR("R2KI=")));
-        if (value >= 0)
+        float value;
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2KI=")), 0.0f, 25.5f, &value))
         {
             slice.relayHeater2.Ki = value;
             Serial.print(F("R2 Ki: "));
@@ -284,13 +284,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Ki must be >= 0"));
+            Serial.println(F("Ki must be 0 to 25.5"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R2KD=")))
     {
-        double value = atof(after_prefix_P(cmd, PSTR("R2KD=")));
-        if (value >= 0)
+        float value;
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2KD=")), 0.0f, 25.5f, &value))
         {
             slice.relayHeater2.Kd = value;
             Serial.print(F("R2 Kd: "));
@@ -298,13 +298,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Kd must be >= 0"));
+            Serial.println(F("Kd must be 0 to 25.5"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R1PERIOD=")))
     {
-        long value = atol(after_prefix_P(cmd, PSTR("R1PERIOD=")));
-        if (value >= 100 && value <= 10000)
+        long value;
+        if (bsc::parseLong(after_prefix_P(cmd, PSTR("R1PERIOD=")), RLHT_PERIOD_MIN_MS, RLHT_PERIOD_MAX_MS, &value))
         {
             setRelayPeriod(1, (uint16_t)value);
             Serial.print(F("R1 period: "));
@@ -318,8 +318,8 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("R2PERIOD=")))
     {
-        long value = atol(after_prefix_P(cmd, PSTR("R2PERIOD=")));
-        if (value >= 100 && value <= 10000)
+        long value;
+        if (bsc::parseLong(after_prefix_P(cmd, PSTR("R2PERIOD=")), RLHT_PERIOD_MIN_MS, RLHT_PERIOD_MAX_MS, &value))
         {
             setRelayPeriod(2, (uint16_t)value);
             Serial.print(F("R2 period: "));
@@ -333,11 +333,12 @@ static void processCommand(char *cmd)
     }
     else if (starts_with_P(cmd, PSTR("WDOG=")))
     {
-        long v = atol(after_prefix_P(cmd, PSTR("WDOG=")));
-        if (v < 0)
-            v = 0;
-        if (v > 65535)
-            v = 65535;
+        long v;
+        if (!bsc::parseLong(after_prefix_P(cmd, PSTR("WDOG=")), 0, 65535, &v))
+        {
+            Serial.println(F("Ignored: expected a whole number from 0 to 65535"));
+            return;
+        }
         // Re-arms without clearing a trip, as SET_WATCHDOG does.
         commandWatchdog.arm((uint16_t)v, millis());
         Serial.print(F("WDOG-> "));
