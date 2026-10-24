@@ -8,12 +8,13 @@ parent: Bench Records
 **Status: plan.** Expected values are filled in from the host tests and the
 issues; Observed and Result are filled in at the bench.
 
-**Verifies:** on `main` at `74dd10a`,
+**Verifies:** on `main` at `03089e1`,
 [#57](https://github.com/feastorg/Slice_RLHT/pull/57) (e-stop, watchdog and
 status LED from bread-slice-core 0.1, FastLED gone),
 [#58](https://github.com/feastorg/Slice_RLHT/pull/58) (one serial line per loop
 pass, #39) and [#59](https://github.com/feastorg/Slice_RLHT/pull/59) (strict
-serial numbers, #51).
+serial numbers, #51) with [#61](https://github.com/feastorg/Slice_RLHT/pull/61)
+(serial gains up to 65.535).
 **By:** @CameronBrooks11
 
 ## Coverage
@@ -40,7 +41,7 @@ Not run, and why:
 
 | | |
 | --- | --- |
-| Firmware | `74dd10a`, envs `gen2_nano` and `gen1_nanoevery`. bread-slice-core 0.1.0, CRUMBS 0.16.2, bread-crumbs-contracts 0.10.0 |
+| Firmware | `03089e1`, envs `gen2_nano` and `gen1_nanoevery`. bread-slice-core 0.1.0, CRUMBS 0.16.2, bread-crumbs-contracts 0.10.0 |
 | Boards | gen2 Nano (ATmega328P); gen1 Nano Every (ATmega4809) |
 | Controller | Raspberry Pi 4 Model B, I2C at 50 kHz, address 19, CRUMBS Python binding 0.16.2 and contracts 0.10.0, via [`rlht_bench.py`](assets/2026-10-24-core-and-serial/rlht_bench.py). USB serial only for R5 and R6 |
 | Power | backplane (I2C and 12 V), one RLHT on the bus at a time |
@@ -64,7 +65,7 @@ Flashing, and every step that switches a relay, waits for your go.
 | R3 e-stop hold: `mode 1`, `duty 100 100`, `state`; D2 to GND, `state`; `duty 100 100`; D2 open, `state` | both relay LEDs on, `on=1000,1000`; then estop 1, count 1, relays 0,0, `on=0,0`, both LEDs off; `duty` refused reason 3 (ESTOP); after release estop 0, LEDs stay off, `on=0,0` | | |
 | R4 watchdog trip: `duty 100 100`, `wd 500`, wait 1.2 s, `wdog`, `state`; `duty 100 100`; `wd 1000`, `wdog`; `clear`, `wdog`, `state` | tripped 1, trips 1, relays off, `on=0,0`; `duty` refused reason 2 (WATCHDOG_TRIP); still tripped after `wd 1000`; `clear` applied, tripped 0, trips 1, relays stay off. Then `wd 0`, so the board doesn't trip again while idle | | |
 | R5 serial burst (#39): `prep`, then `flood 15`; ~5 s in, D2 to GND for 2 s, then open | `estop=1` within one or two 20 ms polls of the press, count +1; no failed polls; no reboot (a reboot shows as a boot blue and the count dropping back) | | |
-| R6 strict parsing (#51): `mode 0` (`R1TEMP=` is checked only in closed loop). Each malformed line follows a valid one, so the old parser's result would differ: `ser "R1TEMP=40" "R1TEMP=499junk" "R1TC=1" "R1TC=2.9" "WDOG=60000" "WDOG=abc" "R1KP=1.5" "R1KP=inf"`, then `state`, `wdog`; then `ser "R1TEMP=0" "WDOG=0"` | the valid lines reply `Relay 1 setpoint: 40.00`, `R1 TC: 1`, `WDOG-> 60000 ms`, `R1 Kp: 1.50`; each malformed one is refused with its range message (`Temp out of range (0-500C)`, `TC select 1 or 2`, `Ignored: expected a whole number from 0 to 65535`, `Kp must be 0 to 25.5`). `state` shows `sp=40.0`, `tc=1`; `wdog` armed at 60000. Before #59 these read 499, 2 and disarmed. Relay 1 may switch on while the setpoint is 40 (an LED load). Kp isn't in GET_STATE; that it stays 1.5 is host-tested | | |
+| R6 strict parsing (#51): `mode 0` (`R1TEMP=` is checked only in closed loop). Each malformed line follows a valid one, so the old parser's result would differ: `ser "R1TEMP=40" "R1TEMP=499junk" "R1TC=1" "R1TC=2.9" "WDOG=60000" "WDOG=abc" "R1KP=1.5" "R1KP=inf" "R1KP=50"`, then `state`, `wdog`; then `ser "R1TEMP=0" "WDOG=0"` | the valid lines reply `Relay 1 setpoint: 40.00`, `R1 TC: 1`, `WDOG-> 60000 ms`, `R1 Kp: 1.50`, `R1 Kp: 50.00` (#59 alone refused it, with its 25.5 cap); each malformed one is refused with its range message (`Temp out of range (0-500C)`, `TC select 1 or 2`, `Ignored: expected a whole number from 0 to 65535`, `Kp must be 0 to 65.535`). `state` shows `sp=40.0`, `tc=1`; `wdog` armed at 60000. Before #59 these read 499, 2 and disarmed. Relay 1 may switch on while the setpoint is 40 (an LED load). Kp isn't in GET_STATE; that `R1KP=inf` leaves it at 1.5 is host-tested | | |
 
 ## Steps and Results: gen1 Nano Every
 
