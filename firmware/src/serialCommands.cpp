@@ -390,6 +390,10 @@ void serialCommands()
             cmdBuf[cmdIdx] = '\0';
             processCommand(cmdBuf);
             cmdIdx = 0;
+            // One line per loop() pass: each reply can block on a full
+            // transmit buffer, so the rest waits and the e-stop is sampled
+            // between lines (#39).
+            return;
         }
         else if (cmdIdx < sizeof(cmdBuf) - 1)
         {
