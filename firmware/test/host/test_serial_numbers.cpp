@@ -33,11 +33,15 @@ int main()
     setup();
     loop();
 
-    // Gains: finite, 0 to 25.5 (SET_PID carries u8 x10).
+    // Gains: finite, 0 to 65.535, the range a u16 x1000 SET_PID would carry
+    // (bread-crumbs-contracts#64). A relay heater's Kp is in ms of on-time
+    // per degree, so tens are ordinary.
     serial("R1KP=1.5");
     host_check("R1KP=1.5 is applied", applied("R1 Kp: ") && slice.relayHeater1.Kp == 1.5);
-    for (const char *line : {"R1KP=abc", "R1KP=", "R1KP=inf", "R1KP=1e9", "R1KP=2.5xyz", "R1KP=-1", "R1KP=26"})
+    for (const char *line : {"R1KP=abc", "R1KP=", "R1KP=inf", "R1KP=1e9", "R1KP=2.5xyz", "R1KP=-1", "R1KP=70"})
         refuses(line, "R1 Kp: ", slice.relayHeater1.Kp == 1.5);
+    serial("R1KP=50");
+    host_check("R1KP=50 is applied", applied("R1 Kp: ") && slice.relayHeater1.Kp == 50);
     serial("R1KD=0.5");
     refuses("R1KD=inf", "R1 Kd: ", slice.relayHeater1.Kd == 0.5);
 

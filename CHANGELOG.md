@@ -88,9 +88,11 @@ This project did not use formal release tags through most of its history, so thi
   `R1TEMP=abc` used to turn the heater off, `R1TEMP=499junk` set 499,
   `R1TC=2.9` selected thermocouple 2, `R1KP=inf` and `R1KP=1e9` were taken,
   and `WDOG=abc` disarmed the watchdog. The ranges are the ones each
-  command already checked, except the gains: 0 to 25.5, SET_PID's range
-  (u8 x10), where any value >= 0 was taken before. Flash grows by about
-  1 KB.
+  command already checked, except the gains: 0 to 65.535, the range a u16
+  x1000 SET_PID would carry (bread-crumbs-contracts#64), where any value
+  >= 0 was taken before. Today's u8 x10 SET_PID stops at 25.5, which can be too low for
+  a relay heater whose Kp is in ms of on-time per degree, so serial keeps
+  the wider range. Flash grows by about 1 KB.
 - **A burst of serial input no longer holds the loop** (#39). The serial
   reader handled every buffered line in one call, and each reply blocks
   once the transmit buffer fills, so the e-stop went unsampled until the
