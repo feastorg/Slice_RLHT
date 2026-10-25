@@ -220,7 +220,7 @@ static void processCommand(char *cmd)
     else if (starts_with_P(cmd, PSTR("R1KP=")))
     {
         float value;
-        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1KP=")), 0.0f, 25.5f, &value))
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1KP=")), 0.0f, 65.535f, &value))
         {
             slice.relayHeater1.Kp = value;
             Serial.print(F("R1 Kp: "));
@@ -228,13 +228,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Kp must be 0 to 25.5"));
+            Serial.println(F("Kp must be 0 to 65.535"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R1KI=")))
     {
         float value;
-        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1KI=")), 0.0f, 25.5f, &value))
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1KI=")), 0.0f, 65.535f, &value))
         {
             slice.relayHeater1.Ki = value;
             Serial.print(F("R1 Ki: "));
@@ -242,13 +242,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Ki must be 0 to 25.5"));
+            Serial.println(F("Ki must be 0 to 65.535"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R1KD=")))
     {
         float value;
-        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1KD=")), 0.0f, 25.5f, &value))
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1KD=")), 0.0f, 65.535f, &value))
         {
             slice.relayHeater1.Kd = value;
             Serial.print(F("R1 Kd: "));
@@ -256,13 +256,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Kd must be 0 to 25.5"));
+            Serial.println(F("Kd must be 0 to 65.535"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R2KP=")))
     {
         float value;
-        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2KP=")), 0.0f, 25.5f, &value))
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2KP=")), 0.0f, 65.535f, &value))
         {
             slice.relayHeater2.Kp = value;
             Serial.print(F("R2 Kp: "));
@@ -270,13 +270,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Kp must be 0 to 25.5"));
+            Serial.println(F("Kp must be 0 to 65.535"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R2KI=")))
     {
         float value;
-        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2KI=")), 0.0f, 25.5f, &value))
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2KI=")), 0.0f, 65.535f, &value))
         {
             slice.relayHeater2.Ki = value;
             Serial.print(F("R2 Ki: "));
@@ -284,13 +284,13 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Ki must be 0 to 25.5"));
+            Serial.println(F("Ki must be 0 to 65.535"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R2KD=")))
     {
         float value;
-        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2KD=")), 0.0f, 25.5f, &value))
+        if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2KD=")), 0.0f, 65.535f, &value))
         {
             slice.relayHeater2.Kd = value;
             Serial.print(F("R2 Kd: "));
@@ -298,7 +298,7 @@ static void processCommand(char *cmd)
         }
         else
         {
-            Serial.println(F("Kd must be 0 to 25.5"));
+            Serial.println(F("Kd must be 0 to 65.535"));
         }
     }
     else if (starts_with_P(cmd, PSTR("R1PERIOD=")))
