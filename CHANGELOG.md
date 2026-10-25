@@ -34,6 +34,12 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Changed
 
+- Requires bread-crumbs-contracts `^0.11.0` (`firmware/platformio.ini` and
+  `slice.yaml`), the release that defines the setpoint limits (#47), the
+  heater faults (#48), the watchdog lease and the 12-byte SET_PID. It is
+  additive: RLHT advertises none of the new flags yet, and the gen2 Nano and
+  gen1 Nano Every images are the sizes benched on 0.10.0 (21548 and
+  22147 B of flash).
 - **The e-stop input, command watchdog and status LED come from
   bread-slice-core 0.1** (feastorg/.github#4). `bsc::EStop`,
   `bsc::bootWait()`, `bsc::CommandWatchdog` and `bsc::StatusLed` replace
