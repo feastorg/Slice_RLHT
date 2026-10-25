@@ -28,6 +28,11 @@ static double deci_c_to_temp(int16_t t)
     return ((double)t) / 10.0;
 }
 
+// SET_SETPOINTS carries deci-degrees in an i16, so the ceiling has to fit.
+static_assert(RLHT_SETPOINT_MAX_C > 0 && RLHT_SETPOINT_MAX_C <= 3276,
+              "RLHT_SETPOINT_MAX_C must be 1 to 3276 C (i16 deci-degrees)");
+static const int16_t SETPOINT_MAX_DECI_C = RLHT_SETPOINT_MAX_C * 10;
+
 // 0 if no hold is in force, else the reason to refuse a heat-starting
 // command with (RLHT_CAP_ESTOP_HOLD). An e-stop wins over a watchdog trip:
 // clearing the trip does not lift the e-stop hold.
@@ -159,6 +164,23 @@ void handler_set_setpoints(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
     if (rlht_set_setpoints_unpack(data, data_len, &v) != 0)
     {
         (void)crumbs_refuse(ctx, BREAD_REFUSE_MALFORMED);
+        return;
+    }
+
+    // RLHT_CAP_SETPOINT_LIMITS (#47). A setpoint is a closed-loop target:
+    // stored in open loop, it would heat at the next switch to closed loop.
+    if (slice.mode != CLOSED_LOOP)
+    {
+        (void)crumbs_refuse(ctx, BREAD_REFUSE_WRONG_MODE);
+        return;
+    }
+
+    // Above the ceiling neither setpoint is stored, unlike the per-channel
+    // SETs: a frame is one target for the slice. A setpoint at or below 0 is
+    // off and accepted.
+    if (v.sp1_deci_c > SETPOINT_MAX_DECI_C || v.sp2_deci_c > SETPOINT_MAX_DECI_C)
+    {
+        (void)crumbs_refuse(ctx, BREAD_REFUSE_UNDEFINED_VALUE);
         return;
     }
 
@@ -366,5 +388,5 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
     (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1,
                                  RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG |
                                      RLHT_CAP_CLEAR_WATCHDOG_TRIP | RLHT_CAP_ESTOP_COUNT |
-                                     RLHT_CAP_REFUSES | RLHT_CAP_ESTOP_HOLD);
+                                     RLHT_CAP_REFUSES | RLHT_CAP_ESTOP_HOLD | RLHT_CAP_SETPOINT_LIMITS);
 }

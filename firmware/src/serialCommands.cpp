@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "config.h"
 #include "globals.h"
 
 // Static receive buffer — no heap allocation.
@@ -41,6 +42,14 @@ static bool refuse_while_held()
         return true;
     }
     return false;
+}
+
+// "Temp out of range (0-500C)" at the default ceiling.
+static void printTempOutOfRange()
+{
+    Serial.print(F("Temp out of range (0-"));
+    Serial.print(RLHT_SETPOINT_MAX_C);
+    Serial.println(F("C)"));
 }
 
 static void processCommand(char *cmd)
@@ -98,7 +107,7 @@ static void processCommand(char *cmd)
         if (slice.mode == CLOSED_LOOP)
         {
             float value;
-            if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1TEMP=")), 0.0f, 500.0f, &value))
+            if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R1TEMP=")), 0.0f, (float)RLHT_SETPOINT_MAX_C, &value))
             {
                 slice.relayHeater1.setpointTemperature = value;
                 Serial.print(F("Relay 1 setpoint: "));
@@ -106,7 +115,7 @@ static void processCommand(char *cmd)
             }
             else
             {
-                Serial.println(F("Temp out of range (0-500C)"));
+                printTempOutOfRange();
             }
         }
         else
@@ -121,7 +130,7 @@ static void processCommand(char *cmd)
         if (slice.mode == CLOSED_LOOP)
         {
             float value;
-            if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2TEMP=")), 0.0f, 500.0f, &value))
+            if (bsc::parseFloat(after_prefix_P(cmd, PSTR("R2TEMP=")), 0.0f, (float)RLHT_SETPOINT_MAX_C, &value))
             {
                 slice.relayHeater2.setpointTemperature = value;
                 Serial.print(F("Relay 2 setpoint: "));
@@ -129,7 +138,7 @@ static void processCommand(char *cmd)
             }
             else
             {
-                Serial.println(F("Temp out of range (0-500C)"));
+                printTempOutOfRange();
             }
         }
         else
