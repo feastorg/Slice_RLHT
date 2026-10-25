@@ -12,7 +12,7 @@ At 115200 baud, one command per line. `HELP` (or `?`) lists them.
 | Command | Effect |
 | --- | --- |
 | `MODE=CLOSED_LOOP` / `MODE=OPEN_LOOP` | Control mode (also `0` / `1`) |
-| `R1TEMP=<C>`, `R2TEMP=<C>` | Setpoint, closed loop; 0 is off |
+| `R1TEMP=<C>`, `R2TEMP=<C>` | Setpoint, closed loop, 0 to `RLHT_SETPOINT_MAX_C` (500); 0 is off |
 | `R1TIME=<ms>`, `R2TIME=<ms>` | On-time per period, open loop |
 | `R1TC=1/2`, `R2TC=1/2` | Thermocouple feeding each heater |
 | `R1KP=`, `R1KI=`, `R1KD=` (and `R2…`) | PID gains |
@@ -60,19 +60,20 @@ on-time of 0.
 A SET the firmware does not act on in full is refused with
 `crumbs_refuse()`, so CRUMBS's GET_ACK reports it refused, with a reason
 from bread-crumbs-contracts `bread_refuse.h`. GET_CAPS advertises
-`RLHT_CAP_REFUSES` and `RLHT_CAP_ESTOP_HOLD`.
+`RLHT_CAP_REFUSES`, `RLHT_CAP_ESTOP_HOLD` and `RLHT_CAP_SETPOINT_LIMITS`.
 
 | Reason | When |
 | --- | --- |
 | `BREAD_REFUSE_MALFORMED` | the payload does not unpack; SET_WATCHDOG lacks its u16; CLEAR_WATCHDOG_TRIP carries a payload |
 | `BREAD_REFUSE_ESTOP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while the hardware e-stop is held; this reason wins when a watchdog trip is held too |
 | `BREAD_REFUSE_WATCHDOG_TRIP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a trip is held |
-| `BREAD_REFUSE_UNDEFINED_VALUE` | SET_MODE other than open or closed loop; SET_TC_SELECT with a channel other than 1 or 2; SET_PERIODS outside `RLHT_PERIOD_MIN_MS`-`RLHT_PERIOD_MAX_MS` (100-10000 ms); SET_OPEN_DUTY above `RLHT_OPEN_DUTY_MAX_PCT` (100 %) |
-| `BREAD_REFUSE_WRONG_MODE` | SET_OPEN_DUTY outside open loop |
+| `BREAD_REFUSE_UNDEFINED_VALUE` | SET_MODE other than open or closed loop; SET_TC_SELECT with a channel other than 1 or 2; SET_PERIODS outside `RLHT_PERIOD_MIN_MS`-`RLHT_PERIOD_MAX_MS` (100-10000 ms); SET_OPEN_DUTY above `RLHT_OPEN_DUTY_MAX_PCT` (100 %); SET_SETPOINTS above `RLHT_SETPOINT_MAX_C` (500 C, a build flag) |
+| `BREAD_REFUSE_WRONG_MODE` | SET_OPEN_DUTY outside open loop; SET_SETPOINTS outside closed loop |
 | `BREAD_REFUSE_UNKNOWN_OP` | an opcode that is not an RLHT or bread-common command, including a GET opcode sent as a command frame instead of through SET_REPLY |
 
 A SET_TC_SELECT, SET_PERIODS or SET_OPEN_DUTY with one channel out of
-range still sets the other channel, then refuses. GET_STATE shows what took
+range still sets the other channel, then refuses. A SET_SETPOINTS with
+either setpoint above the ceiling stores neither. GET_STATE shows what took
 effect. A hold is checked before the payload is unpacked, so a malformed
 SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY sent while tripped or e-stopped
 reads the hold's reason. The serial `R1PERIOD=`/`R2PERIOD=` commands

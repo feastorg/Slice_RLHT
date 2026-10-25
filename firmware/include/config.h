@@ -14,6 +14,14 @@
 #define I2C_ADR 19
 #endif
 
+// Highest setpoint, in whole degrees C, that SET_SETPOINTS and serial
+// R1TEMP=/R2TEMP= accept (#47). Above it, SET_SETPOINTS is refused
+// UNDEFINED_VALUE and serial replies out of range; nothing is stored.
+// Override with a build flag: -DRLHT_SETPOINT_MAX_C=<C>
+#ifndef RLHT_SETPOINT_MAX_C
+#define RLHT_SETPOINT_MAX_C 500
+#endif
+
 #ifdef SLICE_DEBUG
 
 #define SLICE_DEBUG_PRINT(...) \

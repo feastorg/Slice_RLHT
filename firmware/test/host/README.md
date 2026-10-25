@@ -40,6 +40,7 @@ the board. `make` exits non-zero if any check fails.
 | `test_watchdog_trip.cpp` | A command-watchdog trip: GET_WATCHDOG reports it, the relays go off, a SET is refused `WATCHDOG_TRIP`, a re-arm leaves it latched, and `CLEAR_WATCHDOG_TRIP` lifts it, keeps the count and heats nothing |
 | `test_serial_burst.cpp` | A burst of serial lines is answered one line per `loop()` pass, so an e-stop pressed mid-burst is asserted before the next line and the lines after it are refused (#39) |
 | `test_serial_numbers.cpp` | Serial numbers are parsed strictly: each row of #51 (trailing junk, empty, NaN, inf, out of range) is refused with no change, and in-range values still apply (#51) |
+| `test_setpoint_limits.cpp` | SET_SETPOINTS is refused `WRONG_MODE` in open loop and `UNDEFINED_VALUE` above `RLHT_SETPOINT_MAX_C`, storing neither setpoint; the ceiling and negative values apply; one refused in open loop heats nothing after the switch back; GET_CAPS sets `RLHT_CAP_SETPOINT_LIMITS` (#47) |
 | `test_set_pid_length.cpp` | SET_PID is refused `MALFORMED` unless its payload is exactly 6 bytes: a 12-byte u16 x1000 payload, and 7 and 5 bytes, change no gain (#50) |
 | `test_status_led.cpp` | Blue through the boot wait, then green or red on the first `loop()` pass, with the e-stop released or held from power-up; no LED driven on gen1 (#46) |
 

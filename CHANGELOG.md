@@ -40,6 +40,17 @@ This project did not use formal release tags through most of its history, so thi
   additive: RLHT advertises none of the new flags yet, and the gen2 Nano and
   gen1 Nano Every images are the sizes benched on 0.10.0 (21548 and
   22147 B of flash).
+- **SET_SETPOINTS is refused outside closed loop and above a ceiling**
+  (#47). In open loop it is refused `WRONG_MODE`; above
+  `RLHT_SETPOINT_MAX_C` (a build flag, default 500 C) it is refused
+  `UNDEFINED_VALUE`, and neither setpoint is stored. Before, any i16
+  deci-degree value was stored in either mode: one above the MAX6675's
+  1023.75 C range could never be reached, and one sent in open loop started
+  heating at the next switch to closed loop. Serial `R1TEMP=` and `R2TEMP=`
+  already refused both; they now take their ceiling from the same constant.
+  A negative setpoint is still accepted and is off. GET_CAPS advertises
+  `RLHT_CAP_SETPOINT_LIMITS`. A controller that sent setpoints in open loop
+  now sees a refusal: switch to closed loop first (closed loop at 0 is off).
 - **The e-stop input, command watchdog and status LED come from
   bread-slice-core 0.1** (feastorg/.github#4). `bsc::EStop`,
   `bsc::bootWait()`, `bsc::CommandWatchdog` and `bsc::StatusLed` replace

@@ -50,6 +50,11 @@ int main()
     host_check("R1TEMP=100 is applied", applied("Relay 1 setpoint: ") && slice.relayHeater1.setpointTemperature == 100);
     for (const char *line : {"R1TEMP=abc", "R1TEMP=", "R1TEMP=499junk", "R1TEMP=nan"})
         refuses(line, "Relay 1 setpoint: ", slice.relayHeater1.setpointTemperature == 100);
+    // The ceiling is RLHT_SETPOINT_MAX_C, shared with SET_SETPOINTS (#47).
+    serial("R1TEMP=500");
+    host_check("R1TEMP=500 is applied", applied("Relay 1 setpoint: ") && slice.relayHeater1.setpointTemperature == 500);
+    refuses("R1TEMP=500.1", "Relay 1 setpoint: ", slice.relayHeater1.setpointTemperature == 500);
+    host_check("R1TEMP=500.1 replies out of range", applied("Temp out of range (0-500C)"));
 
     // Thermocouple select: 1 or 2.
     serial("R1TC=2");
