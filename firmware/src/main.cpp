@@ -94,6 +94,10 @@ static double pidSetpoint1 = 0.0;
 static double pidInput2 = 0.0;
 static double pidOutput2 = 0.0;
 static double pidSetpoint2 = 0.0;
+// Set by each thermocouple reading and cleared by the compute that takes it,
+// so each reading gets one compute (feastorg/Slice_RLHT#53).
+static bool pidReadingPending1 = false;
+static bool pidReadingPending2 = false;
 
 PID relay1PID(&pidInput1, &pidOutput1, &pidSetpoint1,
               slice.relayHeater1.Kp, slice.relayHeater1.Ki, slice.relayHeater1.Kd, DIRECT);
@@ -135,8 +139,11 @@ static void apply_tunings_if_needed(double kp1, double ki1, double kd1,
     if (!changed)
         return;
 
-    relay1PID.SetTunings(kp1, ki1, kd1);
-    relay2PID.SetTunings(kp2, ki2, kd2);
+    // The PIDs compute once per thermocouple reading (see setupRLHT()), so
+    // the gains are scaled to that interval: per compute, ki x 0.3 s and
+    // kd / 0.3 s, as SetSampleTime(THERMO_UPDATE_TIME_MS) would give.
+    relay1PID.SetTunings(kp1, ki1 * THERMO_UPDATE_TIME_MS, kd1 / THERMO_UPDATE_TIME_MS);
+    relay2PID.SetTunings(kp2, ki2 * THERMO_UPDATE_TIME_MS, kd2 / THERMO_UPDATE_TIME_MS);
 
     lastKp1 = kp1;
     lastKi1 = ki1;
@@ -152,7 +159,7 @@ static void apply_tunings_if_needed(double kp1, double ki1, double kd1,
 // back to automatic, so a heater starts from 0 when a setpoint returns,
 // instead of resuming the duty it had built up (feastorg/Slice_RLHT#13).
 static void computeHeater(PID &pid, double &pidSetpoint, double &pidInput, double &pidOutput,
-                          double setpoint, double input)
+                          bool &readingPending, double setpoint, double input)
 {
     if (setpoint <= 0)
     {
@@ -170,7 +177,10 @@ static void computeHeater(PID &pid, double &pidSetpoint, double &pidInput, doubl
     pidSetpoint = setpoint;
     pidInput = input;
     pid.SetMode(AUTOMATIC);
-    pid.Compute();
+    // Only on a new reading: the PID's 1 ms sample time leaves the pacing to
+    // the readings.
+    if (readingPending && pid.Compute())
+        readingPending = false;
 }
 
 void setRelayPeriod(uint8_t relayId, uint16_t periodMs)
@@ -440,6 +450,17 @@ void setupRLHT()
     slice.relayHeater2.relayPeriod = clampRelayPeriod(slice.relayHeater2.relayPeriod);
     relay2PID.SetOutputLimits(0, slice.relayHeater2.relayPeriod);
 
+    // One compute per thermocouple reading (feastorg/Slice_RLHT#53). At
+    // PID_v1's 100 ms default the derivative came as one impulse, three times
+    // its size, on the compute after each reading, and as zero on the two
+    // after it. PID_v1 times a compute from the previous one, so its own
+    // 300 ms schedule would drift against the readings and now and then take
+    // two at once. Its sample time is 1 ms instead, so it computes whenever
+    // computeHeater() asks, on each reading, and apply_tunings_if_needed()
+    // scales the gains to the reading interval.
+    relay1PID.SetSampleTime(1);
+    relay2PID.SetSampleTime(1);
+
     appliedMode = CLOSED_LOOP;
     apply_tunings_if_needed(slice.relayHeater1.Kp, slice.relayHeater1.Ki, slice.relayHeater1.Kd,
                             slice.relayHeater2.Kp, slice.relayHeater2.Ki, slice.relayHeater2.Kd);
@@ -506,6 +527,8 @@ bool measureThermocouples()
         slice.temperature1 = thermocouple1.readCelsius();
         slice.temperature2 = thermocouple2.readCelsius();
         timing.lastThermoRead += THERMO_UPDATE_TIME_MS;
+        pidReadingPending1 = true;
+        pidReadingPending2 = true;
         return true;
     }
     return false;
@@ -710,7 +733,7 @@ void relayControlLogic()
             break;
         }
 
-        computeHeater(relay1PID, pidSetpoint1, pidInput1, pidOutput1, sp1, slice.relayHeater1.inputTemperature);
+        computeHeater(relay1PID, pidSetpoint1, pidInput1, pidOutput1, pidReadingPending1, sp1, slice.relayHeater1.inputTemperature);
 
 #if (RLHT_RELAY_COUNT >= 2)
         switch (tc2)
@@ -725,7 +748,7 @@ void relayControlLogic()
             break;
         }
 
-        computeHeater(relay2PID, pidSetpoint2, pidInput2, pidOutput2, sp2, slice.relayHeater2.inputTemperature);
+        computeHeater(relay2PID, pidSetpoint2, pidInput2, pidOutput2, pidReadingPending2, sp2, slice.relayHeater2.inputTemperature);
 #endif
 
         drive1 = pidOutput1;

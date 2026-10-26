@@ -132,6 +132,12 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **The heater PIDs compute once per thermocouple reading** (#53). PID_v1
+  computed every 100 ms, its default, on a reading refreshed every 300 ms,
+  so the derivative came as one impulse three times its size and then
+  zero for two computes. The PIDs now compute on each new reading, with
+  the gains scaled to the 300 ms between readings. The integral per
+  second and the proportional term are unchanged.
 - **SET_PID takes exactly 6 bytes** (#50). `rlht_set_pid_unpack` accepts
   trailing bytes, so a widened SET_PID, such as the u16 x1000 one
   bread-crumbs-contracts#64 proposes, was read as u8 x10 gains and applied.
