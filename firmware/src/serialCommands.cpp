@@ -72,10 +72,10 @@ static void processCommand(char *cmd)
     if (*cmd == '\0')
         return;
 
-    // A serial operator is a live master too: feed the command watchdog.
-    // Only WDCLEAR clears a trip; any other line, a logger's included,
-    // leaves the hold latched.
-    commandWatchdog.stamp(millis());
+    // A serial operator is a live master too: feed the command watchdog,
+    // unless a commands-only lease is set. Only WDCLEAR clears a trip; any
+    // other line, a logger's included, leaves the hold latched.
+    livenessStamp();
 
     if (starts_with_P(cmd, PSTR("MODE=")))
     {
@@ -354,7 +354,9 @@ static void processCommand(char *cmd)
             Serial.println(F("Ignored: expected a whole number from 0 to 65535"));
             return;
         }
-        // Re-arms without clearing a trip, as SET_WATCHDOG does.
+        // Re-arms without clearing a trip, as SET_WATCHDOG does, and ends a
+        // commands-only lease, as the 2-byte SET_WATCHDOG does.
+        watchdogCommandsOnly = false;
         commandWatchdog.arm((uint16_t)v, millis());
         Serial.print(F("WDOG-> "));
         if (v == 0)

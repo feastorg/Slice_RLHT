@@ -8,6 +8,12 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Added
 
+- **A command lease for the watchdog** (`RLHT_CAP_WATCHDOG_LEASE`,
+  bread-crumbs-contracts#63). A 3-byte `SET_WATCHDOG` with
+  `BREAD_WATCHDOG_FLAG_COMMANDS_ONLY` lets only `SET_MODE`, `SET_SETPOINTS`,
+  `SET_OPEN_DUTY` and `SET_WATCHDOG` refresh it, so a poller that outlives
+  the control path no longer keeps the heaters on. The 2-byte form and serial
+  `WDOG=` end the lease; an undefined flag is refused and arms nothing.
 - **Heater faults** (#48, `RLHT_CAP_FAULTS`). An over-temperature in either
   mode (above `RLHT_OVERTEMP_C`, default 525 C), no rise in closed loop (output
   at or above 90 % for 120 s with under 2 C of rise), and an open thermocouple

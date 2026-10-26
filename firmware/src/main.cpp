@@ -33,6 +33,13 @@ bsc::CommandWatchdog commandWatchdog;
 RLHT_SLICE slice;
 Timing timing = {0};
 volatile uint8_t heaterFaults = 0;
+volatile bool watchdogCommandsOnly = false;
+
+void livenessStamp()
+{
+    if (!watchdogCommandsOnly)
+        commandWatchdog.stamp(millis());
+}
 
 static_assert(RLHT_OVERTEMP_C > RLHT_SETPOINT_MAX_C,
               "RLHT_OVERTEMP_C must be above RLHT_SETPOINT_MAX_C, or a reachable setpoint faults");
@@ -287,9 +294,19 @@ static bool is_command_op(uint8_t opcode)
     }
 }
 
+// The commands that keep a commands-only lease alive: the ones that start or
+// change heating. SET_WATCHDOG, the lease's keepalive, refreshes it through
+// arm() in its handler.
+static bool is_actuating_op(uint8_t opcode)
+{
+    return opcode == RLHT_OP_SET_MODE || opcode == RLHT_OP_SET_SETPOINTS ||
+           opcode == RLHT_OP_SET_OPEN_DUTY;
+}
+
 static void on_crumbs_message(crumbs_context_t *c, const crumbs_message_t *msg)
 {
-    commandWatchdog.stamp(millis());
+    if (!watchdogCommandsOnly || is_actuating_op(msg->opcode))
+        commandWatchdog.stamp(millis());
     if (!is_command_op(msg->opcode))
         (void)crumbs_refuse(c, BREAD_REFUSE_UNKNOWN_OP);
 }
