@@ -237,27 +237,58 @@ void handler_set_setpoints(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
     slice.relayHeater2.setpointTemperature = deci_c_to_temp(v.sp2_deci_c);
 }
 
+// Two lengths, told apart by data_len, and any other refused MALFORMED
+// (#50): 6 bytes, six u8 gains x10 (0 to 25.5 in steps of 0.1); 12 bytes,
+// six u16 gains x1000 (0 to 65.535), RLHT_CAP_PID_X1000. Each unpack alone
+// accepts trailing bytes, so the length is checked first.
 void handler_set_pid(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
-    rlht_set_pid_t v;
+    double kp1, ki1, kd1, kp2, ki2, kd2;
     (void)opcode;
     (void)user_data;
 
-    // Exactly the wire size (rlht_set_pid_unpack alone accepts trailing
-    // bytes): a widened SET_PID would otherwise be read as these u8 x10
-    // gains and applied (#50).
-    if (data_len != rlht_set_pid_wire_size || rlht_set_pid_unpack(data, data_len, &v) != 0)
+    if (data_len == RLHT_SET_PID_PAYLOAD_LEN)
+    {
+        rlht_set_pid_t v;
+        if (rlht_set_pid_unpack(data, data_len, &v) != 0)
+        {
+            (void)crumbs_refuse(ctx, BREAD_REFUSE_MALFORMED);
+            return;
+        }
+        kp1 = v.kp1_x10 / 10.0;
+        ki1 = v.ki1_x10 / 10.0;
+        kd1 = v.kd1_x10 / 10.0;
+        kp2 = v.kp2_x10 / 10.0;
+        ki2 = v.ki2_x10 / 10.0;
+        kd2 = v.kd2_x10 / 10.0;
+    }
+    else if (data_len == RLHT_SET_PID_X1000_PAYLOAD_LEN)
+    {
+        rlht_set_pid_x1000_t v;
+        if (rlht_set_pid_x1000_unpack(data, data_len, &v) != 0)
+        {
+            (void)crumbs_refuse(ctx, BREAD_REFUSE_MALFORMED);
+            return;
+        }
+        kp1 = v.kp1_x1000 / 1000.0;
+        ki1 = v.ki1_x1000 / 1000.0;
+        kd1 = v.kd1_x1000 / 1000.0;
+        kp2 = v.kp2_x1000 / 1000.0;
+        ki2 = v.ki2_x1000 / 1000.0;
+        kd2 = v.kd2_x1000 / 1000.0;
+    }
+    else
     {
         (void)crumbs_refuse(ctx, BREAD_REFUSE_MALFORMED);
         return;
     }
 
-    slice.relayHeater1.Kp = ((double)v.kp1_x10) / 10.0;
-    slice.relayHeater1.Ki = ((double)v.ki1_x10) / 10.0;
-    slice.relayHeater1.Kd = ((double)v.kd1_x10) / 10.0;
-    slice.relayHeater2.Kp = ((double)v.kp2_x10) / 10.0;
-    slice.relayHeater2.Ki = ((double)v.ki2_x10) / 10.0;
-    slice.relayHeater2.Kd = ((double)v.kd2_x10) / 10.0;
+    slice.relayHeater1.Kp = kp1;
+    slice.relayHeater1.Ki = ki1;
+    slice.relayHeater1.Kd = kd1;
+    slice.relayHeater2.Kp = kp2;
+    slice.relayHeater2.Ki = ki2;
+    slice.relayHeater2.Kd = kd2;
 }
 
 void handler_set_periods(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
@@ -441,5 +472,6 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
                                  RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG |
                                      RLHT_CAP_CLEAR_WATCHDOG_TRIP | RLHT_CAP_ESTOP_COUNT |
                                      RLHT_CAP_REFUSES | RLHT_CAP_ESTOP_HOLD | RLHT_CAP_SETPOINT_LIMITS |
-                                     RLHT_CAP_FAULTS | RLHT_CAP_WATCHDOG_LEASE);
+                                     RLHT_CAP_FAULTS | RLHT_CAP_WATCHDOG_LEASE |
+                                     RLHT_CAP_PID_X1000);
 }

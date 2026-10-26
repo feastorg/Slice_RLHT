@@ -8,6 +8,11 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Added
 
+- **SET_PID takes u16 gains x1000** (`RLHT_CAP_PID_X1000`,
+  bread-crumbs-contracts#64). A 12-byte SET_PID carries six u16 gains x1000,
+  0 to 65.535, beside the 6-byte u8 x10 form (0 to 25.5 in steps of 0.1),
+  which can be too coarse and too low for a heater. Any other length is still
+  refused `MALFORMED`. Serial `R1KP=` and the like already took 0 to 65.535.
 - **A command lease for the watchdog** (`RLHT_CAP_WATCHDOG_LEASE`,
   bread-crumbs-contracts#63). A 3-byte `SET_WATCHDOG` with
   `BREAD_WATCHDOG_FLAG_COMMANDS_ONLY` lets only `SET_MODE`, `SET_SETPOINTS`,
