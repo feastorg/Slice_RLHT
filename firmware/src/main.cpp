@@ -259,6 +259,15 @@ void loop()
     printSerialOutput();
 }
 
+// The commands that keep a commands-only lease alive: the ones that start or
+// change heating. SET_WATCHDOG, the lease's keepalive, refreshes it through
+// arm() in its handler.
+static bool is_actuating_op(uint8_t opcode)
+{
+    return opcode == RLHT_OP_SET_MODE || opcode == RLHT_OP_SET_SETPOINTS ||
+           opcode == RLHT_OP_SET_OPEN_DUTY;
+}
+
 // Fires for every CRC-valid inbound command frame (SET_REPLY excluded by
 // CRUMBS): any valid command proves a live master, so it stamps liveness.
 // It does not clear a trip (feastorg/Slice_RLHT#9). The trip latches until
@@ -276,18 +285,8 @@ void loop()
 // The commands are the opcodes setupSlice() registers a handler for, asked of
 // the handler table itself: the contract's opcode tables also hold the GET
 // opcodes, which are queries answered through SET_REPLY. A GET opcode sent as
-// a command frame has nothing behind it, and read APPLIED before
-// (feastorg/Slice_RLHT#36). So does a command whose registration failed.
-//
-// The commands that keep a commands-only lease alive: the ones that start or
-// change heating. SET_WATCHDOG, the lease's keepalive, refreshes it through
-// arm() in its handler.
-static bool is_actuating_op(uint8_t opcode)
-{
-    return opcode == RLHT_OP_SET_MODE || opcode == RLHT_OP_SET_SETPOINTS ||
-           opcode == RLHT_OP_SET_OPEN_DUTY;
-}
-
+// a command frame has no handler, so it is refused; it read APPLIED before
+// (feastorg/Slice_RLHT#36). So is a command whose registration failed.
 static void on_crumbs_message(crumbs_context_t *c, const crumbs_message_t *msg)
 {
     if (!watchdogCommandsOnly || is_actuating_op(msg->opcode))

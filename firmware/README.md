@@ -113,7 +113,7 @@ from bread-crumbs-contracts `bread_refuse.h`. GET_CAPS advertises
 | `BREAD_REFUSE_FAULT` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a heater fault is latched |
 | `BREAD_REFUSE_UNDEFINED_VALUE` | SET_MODE other than open or closed loop; a SET_WATCHDOG flag other than `BREAD_WATCHDOG_FLAG_COMMANDS_ONLY`; SET_TC_SELECT with a channel other than 1 or 2; SET_PERIODS outside `RLHT_PERIOD_MIN_MS`-`RLHT_PERIOD_MAX_MS` (100-10000 ms); SET_OPEN_DUTY above `RLHT_OPEN_DUTY_MAX_PCT` (100 %); SET_SETPOINTS above `RLHT_SETPOINT_MAX_C` (500 C, a build flag) |
 | `BREAD_REFUSE_WRONG_MODE` | SET_OPEN_DUTY outside open loop; SET_SETPOINTS outside closed loop |
-| `BREAD_REFUSE_UNKNOWN_OP` | an opcode that is not an RLHT or bread-common command, including a GET opcode sent as a command frame instead of through SET_REPLY |
+| `BREAD_REFUSE_UNKNOWN_OP` | an opcode with no registered command handler, including a GET opcode sent as a command frame instead of through SET_REPLY |
 
 A SET_TC_SELECT, SET_PERIODS or SET_OPEN_DUTY with one channel out of
 range still sets the other channel, then refuses. A SET_SETPOINTS with
