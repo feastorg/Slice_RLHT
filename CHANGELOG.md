@@ -30,7 +30,8 @@ This project did not use formal release tags through most of its history, so thi
   which resume nothing. The thresholds are build flags and starting values,
   not measurements. Before, only a NaN reading stopped a heater, for that
   pass only: a probe off the heater or shorted kept the PID at full output.
-  The serial `READ` line ends with `FAULT:0x<bits>`.
+  In `SLICE_DEBUG` builds the periodic serial state line ends with
+  `FAULT:0x<bits>`.
 - **Host tests** in `firmware/test/host`: the firmware's own sources built
   against the real CRUMBS core, the contracts headers and PID_v1, with the
   Arduino core, FastLED and the MAX6675 driver stubbed, once per PlatformIO
