@@ -20,7 +20,8 @@ This project did not use formal release tags through most of its history, so thi
   the control path no longer keeps the heaters on. The 2-byte form and serial
   `WDOG=` end the lease; an undefined flag is refused and arms nothing.
 - **Heater faults** (#48, `RLHT_CAP_FAULTS`). An over-temperature in either
-  mode (above `RLHT_OVERTEMP_C`, default 525 C), no rise in closed loop (output
+  mode (3 readings in a row above `RLHT_OVERTEMP_C`, default 525 C, so one
+  bad reading does not latch it, #70), no rise in closed loop (output
   at or above 90 % for 120 s with under 2 C of rise), and an open thermocouple
   in closed loop with a setpoint (3 readings in a row) each latch a fault that
   holds both heaters off, as a watchdog trip does. `BREAD_OP_GET_FAULTS`

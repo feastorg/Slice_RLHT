@@ -75,7 +75,7 @@ on the thermocouple each heater is set to (`R1TC=`/`R2TC=`):
 
 | Fault | When | Bit |
 | --- | --- | --- |
-| Over-temperature | the reading is above `RLHT_OVERTEMP_C` (525 C), in either mode | `RLHT_FAULT_H1_OVERTEMP` / `_H2_` |
+| Over-temperature | `RLHT_OVERTEMP_READS` (3) readings in a row above `RLHT_OVERTEMP_C` (525 C), in either mode | `RLHT_FAULT_H1_OVERTEMP` / `_H2_` |
 | No rise | closed loop with a setpoint: the PID output has stayed at or above `RLHT_NO_RISE_OUTPUT_PCT` (90 %) of the period for `RLHT_NO_RISE_MS` (120 s), and the temperature has risen less than `RLHT_NO_RISE_DELTA_C` (2 C) | `RLHT_FAULT_H1_NO_RISE` / `_H2_` |
 | Sensor | closed loop with a setpoint: `RLHT_SENSOR_FAULT_READS` (3) readings in a row of an open thermocouple | `RLHT_FAULT_H1_SENSOR` / `_H2_` |
 
