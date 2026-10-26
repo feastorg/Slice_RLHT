@@ -70,8 +70,11 @@ int main()
     host_send(RLHT_TYPE_ID, RLHT_OP_SET_PID, ki, 6);
     host_check("SET_PID is applied", host_read_ack().status == CRUMBS_ACK_APPLIED);
     host_tc1_celsius = host_tc2_celsius = 290.0f;
-    host_now += 7;
-    loop();
+    while (slice.temperature1 != 290.0f) // a reading at 290 C before heating
+    {
+        host_now += 7;
+        loop();
+    }
     host_send(RLHT_TYPE_ID, RLHT_OP_SET_SETPOINTS, sps, 4);
     (void)host_read_ack();
     const unsigned long start = host_now;
