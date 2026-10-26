@@ -165,9 +165,19 @@ int main()
     host_check("open loop at 100 % is applied", applied());
     loop();
     host_check("open loop heats", host_pin_level[RELAY1] == HIGH);
+    // One bad reading, such as a spike while a probe is unplugged, latches
+    // nothing; RLHT_OVERTEMP_READS in a row do (#70).
     host_tc1_celsius = RLHT_OVERTEMP_C + 5.0f;
+    readings(RLHT_OVERTEMP_READS - 1);
+    host_check("RLHT_OVERTEMP_READS - 1 readings above RLHT_OVERTEMP_C latch nothing", faults() == 0);
+    host_tc1_celsius = 25.0f;
     readings(1);
-    host_check("above RLHT_OVERTEMP_C in open loop latches H1_OVERTEMP", faults() & RLHT_FAULT_H1_OVERTEMP);
+    host_tc1_celsius = RLHT_OVERTEMP_C + 5.0f;
+    readings(RLHT_OVERTEMP_READS - 1);
+    host_check("a reading within the limit restarts the count", faults() == 0);
+    readings(1);
+    host_check("RLHT_OVERTEMP_READS readings above RLHT_OVERTEMP_C in open loop latch H1_OVERTEMP",
+               faults() & RLHT_FAULT_H1_OVERTEMP);
     loop();
     host_check("the relays go off", relays_off() && slice.relayHeater1.relayOnTime == 0);
     // The loop's hold is the backstop for a path that misses the refusal: an
@@ -183,13 +193,13 @@ int main()
     host_tc1_celsius = RLHT_OVERTEMP_C;
     send_clear();
     (void)host_read_ack();
-    readings(2);
+    readings(RLHT_OVERTEMP_READS + 1);
     host_check("at RLHT_OVERTEMP_C itself nothing latches", faults() == 0);
     clear_and_reset_inputs();
 
     // ---- Precedence: an e-stop held over a latched fault refuses ESTOP.
     host_tc1_celsius = RLHT_OVERTEMP_C + 5.0f;
-    readings(1);
+    readings(RLHT_OVERTEMP_READS);
     host_estop_level = LOW;
     loop();
     send_open_duty(10, 10);
@@ -205,7 +215,7 @@ int main()
     send_mode(RLHT_MODE_CLOSED_LOOP);
     (void)host_read_ack();
     host_tc1_celsius = RLHT_OVERTEMP_C + 5.0f;
-    readings(1);
+    readings(RLHT_OVERTEMP_READS);
     Serial.out.clear();
     Serial.in += "R1TEMP=40\n";
     loop();

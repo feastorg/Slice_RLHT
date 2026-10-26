@@ -27,10 +27,14 @@
 // These are starting values, not measured ones: a deployment sets them for
 // its equipment with build flags.
 //
-// Over-temperature, in either mode: the heater's thermocouple reads above
-// this (whole degrees C).
+// Over-temperature, in either mode: RLHT_OVERTEMP_READS consecutive
+// readings of the heater's thermocouple above RLHT_OVERTEMP_C (whole degrees
+// C). One bad reading does not latch it (#70).
 #ifndef RLHT_OVERTEMP_C
 #define RLHT_OVERTEMP_C 525
+#endif
+#ifndef RLHT_OVERTEMP_READS
+#define RLHT_OVERTEMP_READS 3
 #endif
 // No rise, in closed loop: the PID output has stayed at or above
 // RLHT_NO_RISE_OUTPUT_PCT of the relay period for RLHT_NO_RISE_MS, and the

@@ -45,6 +45,8 @@ static_assert(RLHT_OVERTEMP_C > RLHT_SETPOINT_MAX_C,
               "RLHT_OVERTEMP_C must be above RLHT_SETPOINT_MAX_C, or a reachable setpoint faults");
 static_assert(RLHT_NO_RISE_OUTPUT_PCT > 0 && RLHT_NO_RISE_OUTPUT_PCT <= 100,
               "RLHT_NO_RISE_OUTPUT_PCT must be 1 to 100");
+static_assert(RLHT_OVERTEMP_READS >= 1 && RLHT_OVERTEMP_READS <= 255,
+              "RLHT_OVERTEMP_READS must be 1 to 255");
 
 static ControlMode appliedMode = CLOSED_LOOP;
 static bool pidTuningsApplied = false;
@@ -559,6 +561,7 @@ struct FaultWatch
     unsigned long windowStart = 0;
     double windowStartTemp = 0.0;
     uint8_t nanReads = 0;
+    uint8_t hotReads = 0;
 };
 static FaultWatch watch1;
 static FaultWatch watch2;
@@ -572,7 +575,16 @@ static uint8_t heaterFaultBits(FaultWatch &w, double temp, bool active, double o
     uint8_t bits = 0;
 
     if (!isnan(temp) && temp > RLHT_OVERTEMP_C)
-        bits |= overtempBit;
+    {
+        if (w.hotReads < RLHT_OVERTEMP_READS)
+            w.hotReads++;
+        if (w.hotReads >= RLHT_OVERTEMP_READS)
+            bits |= overtempBit;
+    }
+    else
+    {
+        w.hotReads = 0;
+    }
 
     if (active && isnan(temp))
     {
