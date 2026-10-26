@@ -22,6 +22,37 @@
 #define RLHT_SETPOINT_MAX_C 500
 #endif
 
+// Heater faults (#48, RLHT_CAP_FAULTS). Each latches until CLEAR_FAULTS,
+// serial FAULTCLEAR or a reboot, and holds both heaters off meanwhile.
+// These are starting values, not measured ones: a deployment sets them for
+// its equipment with build flags.
+//
+// Over-temperature, in either mode: the heater's thermocouple reads above
+// this (whole degrees C).
+#ifndef RLHT_OVERTEMP_C
+#define RLHT_OVERTEMP_C 525
+#endif
+// No rise, in closed loop: the PID output has stayed at or above
+// RLHT_NO_RISE_OUTPUT_PCT of the relay period for RLHT_NO_RISE_MS, and the
+// temperature has risen less than RLHT_NO_RISE_DELTA_C in that time. The
+// window has to be longer than the slowest healthy heat-up from cold at full
+// output. This catches a probe that has come off the heater or is shorted.
+#ifndef RLHT_NO_RISE_MS
+#define RLHT_NO_RISE_MS 120000UL
+#endif
+#ifndef RLHT_NO_RISE_OUTPUT_PCT
+#define RLHT_NO_RISE_OUTPUT_PCT 90
+#endif
+#ifndef RLHT_NO_RISE_DELTA_C
+#define RLHT_NO_RISE_DELTA_C 2.0
+#endif
+// Sensor, in closed loop with a setpoint: this many consecutive readings of
+// an open thermocouple (NaN). One reading every THERMO_UPDATE_TIME_MS; the
+// first readings after a reset can be NaN.
+#ifndef RLHT_SENSOR_FAULT_READS
+#define RLHT_SENSOR_FAULT_READS 3
+#endif
+
 #ifdef SLICE_DEBUG
 
 #define SLICE_DEBUG_PRINT(...) \

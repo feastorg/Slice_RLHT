@@ -8,6 +8,18 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Added
 
+- **Heater faults** (#48, `RLHT_CAP_FAULTS`). An over-temperature in either
+  mode (above `RLHT_OVERTEMP_C`, default 525 C), no rise in closed loop (output
+  at or above 90 % for 120 s with under 2 C of rise), and an open thermocouple
+  in closed loop with a setpoint (3 readings in a row) each latch a fault that
+  holds both heaters off, as a watchdog trip does. `BREAD_OP_GET_FAULTS`
+  reports the `RLHT_FAULT_*` bits and GET_STATE sets `RLHT_FLAG_FAULT`;
+  `SET_MODE`, `SET_SETPOINTS` and `SET_OPEN_DUTY` are refused
+  `BREAD_REFUSE_FAULT` until `BREAD_OP_CLEAR_FAULTS` or serial `FAULTCLEAR`,
+  which resume nothing. The thresholds are build flags and starting values,
+  not measurements. Before, only a NaN reading stopped a heater, for that
+  pass only: a probe off the heater or shorted kept the PID at full output.
+  The serial `READ` line ends with `FAULT:0x<bits>`.
 - **Host tests** in `firmware/test/host`: the firmware's own sources built
   against the real CRUMBS core, the contracts headers and PID_v1, with the
   Arduino core, FastLED and the MAX6675 driver stubbed, once per PlatformIO
