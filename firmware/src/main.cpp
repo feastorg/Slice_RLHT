@@ -94,6 +94,12 @@ static double pidSetpoint1 = 0.0;
 static double pidInput2 = 0.0;
 static double pidOutput2 = 0.0;
 static double pidSetpoint2 = 0.0;
+// The thermocouple each PID last computed from. 0 until the first closed-loop
+// pass, which then re-initialises the PIDs from their first input.
+static uint8_t appliedTc1 = 0;
+#if (RLHT_RELAY_COUNT >= 2)
+static uint8_t appliedTc2 = 0;
+#endif
 
 PID relay1PID(&pidInput1, &pidOutput1, &pidSetpoint1,
               slice.relayHeater1.Kp, slice.relayHeater1.Ki, slice.relayHeater1.Kd, DIRECT);
@@ -703,9 +709,24 @@ void relayControlLogic()
 
     if (localMode == CLOSED_LOOP)
     {
+        // A thermocouple select change swaps a PID's input to another sensor.
+        // Putting the PID in manual makes computeHeater()'s switch back to
+        // automatic re-initialise it from the new input and the current
+        // output, so the difference between the sensors isn't a step in the
+        // measurement for the derivative to kick on (feastorg/Slice_RLHT#54).
+        if (tc1 != appliedTc1)
+        {
+            relay1PID.SetMode(MANUAL);
+            appliedTc1 = tc1;
+        }
         computeHeater(relay1PID, pidSetpoint1, pidInput1, pidOutput1, sp1, selectedTemperature(tc1));
 
 #if (RLHT_RELAY_COUNT >= 2)
+        if (tc2 != appliedTc2)
+        {
+            relay2PID.SetMode(MANUAL);
+            appliedTc2 = tc2;
+        }
         computeHeater(relay2PID, pidSetpoint2, pidInput2, pidOutput2, sp2, selectedTemperature(tc2));
 #endif
 

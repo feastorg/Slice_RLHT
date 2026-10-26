@@ -136,6 +136,13 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **A thermocouple select change no longer kicks the derivative** (#54).
+  The PID stayed in automatic while its input moved to another sensor,
+  so the difference between the two read as a step in the measurement.
+  A select change in closed loop now re-initialises that heater's PID
+  from the new input and its current output. With Kd 25.5 and sensors
+  100 °C apart, the on-time jumped to the full 1000 ms period; it now
+  stays at 0.
 - **SET_PID takes exactly 6 bytes** (#50). `rlht_set_pid_unpack` accepts
   trailing bytes, so a widened SET_PID, such as the u16 x1000 one
   bread-crumbs-contracts#64 proposes, was read as u8 x10 gains and applied.
