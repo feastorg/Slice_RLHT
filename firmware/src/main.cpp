@@ -503,8 +503,16 @@ bool measureThermocouples()
 {
     if (millis() - timing.lastThermoRead >= THERMO_UPDATE_TIME_MS)
     {
-        slice.temperature1 = thermocouple1.readCelsius();
-        slice.temperature2 = thermocouple2.readCelsius();
+        // Read outside the masked window, store inside it: reply_get_state()
+        // reads these from the TWI ISR, and an unmasked 4-byte store landing
+        // mid-reply reports a mix of the old and new value
+        // (feastorg/Slice_RLHT#25).
+        const double t1 = thermocouple1.readCelsius();
+        const double t2 = thermocouple2.readCelsius();
+        noInterrupts();
+        slice.temperature1 = t1;
+        slice.temperature2 = t2;
+        interrupts();
         timing.lastThermoRead += THERMO_UPDATE_TIME_MS;
         return true;
     }
