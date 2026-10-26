@@ -59,6 +59,10 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Changed
 
+- **The status line shows the selected reading** (#28). The serial
+  status line's `Relay1Input` and `Relay2Input` show the selected
+  thermocouple's reading in either mode. They showed the last
+  closed-loop input, which went stale in open loop.
 - **Command opcodes come from the handler table** (feastorg/CRUMBS#124).
   `on_message` refuses UNKNOWN_OP any opcode without a registered handler,
   asked of CRUMBS with `crumbs_has_handler()`, in place of the hand-kept

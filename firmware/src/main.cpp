@@ -511,6 +511,11 @@ bool measureThermocouples()
     return false;
 }
 
+double selectedTemperature(uint8_t thermocoupleSelect)
+{
+    return (thermocoupleSelect == 2) ? slice.temperature2 : slice.temperature1;
+}
+
 // Latch fault bits and hold the safe state the e-stop and the watchdog trip
 // hold: relays off, setpoints and on-times 0, PIDs in manual. The flag is set
 // in the same masked window, so the I2C handlers refuse from then on. Clearing
@@ -618,12 +623,12 @@ void checkHeaterFaults()
     const uint8_t tc2 = slice.relayHeater2.thermocoupleSelect;
     interrupts();
 
-    const double t1 = (tc1 == 2) ? slice.temperature2 : slice.temperature1;
+    const double t1 = selectedTemperature(tc1);
     uint8_t bits = heaterFaultBits(watch1, t1, closed && sp1 > 0 && !hold, pidOutput1,
                                    slice.relayHeater1.relayPeriod,
                                    RLHT_FAULT_H1_OVERTEMP, RLHT_FAULT_H1_NO_RISE, RLHT_FAULT_H1_SENSOR);
 #if (RLHT_RELAY_COUNT >= 2)
-    const double t2 = (tc2 == 2) ? slice.temperature2 : slice.temperature1;
+    const double t2 = selectedTemperature(tc2);
     bits |= heaterFaultBits(watch2, t2, closed && sp2 > 0 && !hold, pidOutput2,
                             slice.relayHeater2.relayPeriod,
                             RLHT_FAULT_H2_OVERTEMP, RLHT_FAULT_H2_NO_RISE, RLHT_FAULT_H2_SENSOR);
@@ -698,34 +703,10 @@ void relayControlLogic()
 
     if (localMode == CLOSED_LOOP)
     {
-        switch (tc1)
-        {
-        case 1:
-            slice.relayHeater1.inputTemperature = slice.temperature1;
-            break;
-        case 2:
-            slice.relayHeater1.inputTemperature = slice.temperature2;
-            break;
-        default:
-            break;
-        }
-
-        computeHeater(relay1PID, pidSetpoint1, pidInput1, pidOutput1, sp1, slice.relayHeater1.inputTemperature);
+        computeHeater(relay1PID, pidSetpoint1, pidInput1, pidOutput1, sp1, selectedTemperature(tc1));
 
 #if (RLHT_RELAY_COUNT >= 2)
-        switch (tc2)
-        {
-        case 1:
-            slice.relayHeater2.inputTemperature = slice.temperature1;
-            break;
-        case 2:
-            slice.relayHeater2.inputTemperature = slice.temperature2;
-            break;
-        default:
-            break;
-        }
-
-        computeHeater(relay2PID, pidSetpoint2, pidInput2, pidOutput2, sp2, slice.relayHeater2.inputTemperature);
+        computeHeater(relay2PID, pidSetpoint2, pidInput2, pidOutput2, sp2, selectedTemperature(tc2));
 #endif
 
         drive1 = pidOutput1;

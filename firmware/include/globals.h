@@ -20,7 +20,6 @@ struct RelayHeater
 {
     double setpointTemperature = 0.0;
     uint8_t thermocoupleSelect = 0;
-    double inputTemperature = 0.0;
     double relayOnTime = 0.0;
     uint16_t relayPeriod = 1000;
     double Kp = 1.0;
@@ -80,6 +79,9 @@ void updateStatusLed();
 void processEStop(bsc::EStop::Event e);
 void watchdogLogic();
 bool measureThermocouples();
+// The last reading of the thermocouple a select names: 2 is thermocouple 2,
+// anything else thermocouple 1.
+double selectedTemperature(uint8_t thermocoupleSelect);
 void checkHeaterFaults();
 void relayControlLogic();
 void setRelayPeriod(uint8_t relayId, uint16_t periodMs);
