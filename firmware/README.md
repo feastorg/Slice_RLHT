@@ -102,12 +102,12 @@ replace one.
 A SET the firmware does not act on in full is refused with
 `crumbs_refuse()`, so CRUMBS's GET_ACK reports it refused, with a reason
 from bread-crumbs-contracts `bread_refuse.h`. GET_CAPS advertises
-`RLHT_CAP_REFUSES`, `RLHT_CAP_ESTOP_HOLD`, `RLHT_CAP_SETPOINT_LIMITS` and
-`RLHT_CAP_FAULTS`.
+`RLHT_CAP_REFUSES`, `RLHT_CAP_ESTOP_HOLD`, `RLHT_CAP_SETPOINT_LIMITS`,
+`RLHT_CAP_FAULTS`, `RLHT_CAP_WATCHDOG_LEASE` and `RLHT_CAP_PID_X1000`.
 
 | Reason | When |
 | --- | --- |
-| `BREAD_REFUSE_MALFORMED` | the payload does not unpack; SET_WATCHDOG lacks its u16; CLEAR_WATCHDOG_TRIP or CLEAR_FAULTS carries a payload |
+| `BREAD_REFUSE_MALFORMED` | the payload does not unpack; SET_PID is not 6 bytes (u8 gains x10) or 12 bytes (u16 gains x1000, `RLHT_CAP_PID_X1000`); SET_WATCHDOG lacks its u16; CLEAR_WATCHDOG_TRIP or CLEAR_FAULTS carries a payload |
 | `BREAD_REFUSE_ESTOP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while the hardware e-stop is held; this reason wins when a watchdog trip is held too |
 | `BREAD_REFUSE_WATCHDOG_TRIP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a trip is held; this reason wins over a latched fault |
 | `BREAD_REFUSE_FAULT` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a heater fault is latched |
