@@ -14,7 +14,7 @@ At 115200 baud, one command per line. `HELP` (or `?`) lists them.
 | `MODE=CLOSED_LOOP` / `MODE=OPEN_LOOP` | Control mode (also `0` / `1`) |
 | `R1TEMP=<C>`, `R2TEMP=<C>` | Setpoint, closed loop, 0 to `RLHT_SETPOINT_MAX_C` (500); 0 is off |
 | `R1TIME=<ms>`, `R2TIME=<ms>` | On-time per period, open loop |
-| `R1TC=1/2`, `R2TC=1/2` | Thermocouple feeding each heater |
+| `R1TC=1/2`, `R2TC=1/2` | Thermocouple feeding each heater; ignored while that heater heats in closed loop |
 | `R1KP=`, `R1KI=`, `R1KD=` (and `R2…`) | PID gains |
 | `R1PERIOD=<ms>`, `R2PERIOD=<ms>` | Relay period, 100-10000 ms |
 | `WDOG=<ms>` | Arm the command watchdog, or disarm it with 0 |
@@ -112,11 +112,14 @@ from bread-crumbs-contracts `bread_refuse.h`. GET_CAPS advertises
 | `BREAD_REFUSE_WATCHDOG_TRIP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a trip is held; this reason wins over a latched fault |
 | `BREAD_REFUSE_FAULT` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a heater fault is latched |
 | `BREAD_REFUSE_UNDEFINED_VALUE` | SET_MODE other than open or closed loop; a SET_WATCHDOG flag other than `BREAD_WATCHDOG_FLAG_COMMANDS_ONLY`; SET_TC_SELECT with a channel other than 1 or 2; SET_PERIODS outside `RLHT_PERIOD_MIN_MS`-`RLHT_PERIOD_MAX_MS` (100-10000 ms); SET_OPEN_DUTY above `RLHT_OPEN_DUTY_MAX_PCT` (100 %); SET_SETPOINTS above `RLHT_SETPOINT_MAX_C` (500 C, a build flag) |
-| `BREAD_REFUSE_WRONG_MODE` | SET_OPEN_DUTY outside open loop; SET_SETPOINTS outside closed loop |
+| `BREAD_REFUSE_WRONG_MODE` | SET_OPEN_DUTY outside open loop; SET_SETPOINTS outside closed loop; SET_TC_SELECT changing the thermocouple of a heater that is in closed loop with a setpoint above 0 |
 | `BREAD_REFUSE_UNKNOWN_OP` | an opcode with no registered command handler, including a GET opcode sent as a command frame instead of through SET_REPLY |
 
 A SET_TC_SELECT, SET_PERIODS or SET_OPEN_DUTY with one channel out of
-range still sets the other channel, then refuses. A SET_SETPOINTS with
+range still sets the other channel, then refuses. A heater's thermocouple
+changes with its setpoint at 0 or in open loop. Its PID then restarts from
+0 on the new sensor, since the swap would otherwise read as a step in the
+measurement (#54). A SET_SETPOINTS with
 either setpoint above the ceiling stores neither. GET_STATE shows what took
 effect. A hold is checked before the payload is unpacked, so a malformed
 SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY sent during a hold reads the

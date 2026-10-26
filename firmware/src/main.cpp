@@ -94,12 +94,6 @@ static double pidSetpoint1 = 0.0;
 static double pidInput2 = 0.0;
 static double pidOutput2 = 0.0;
 static double pidSetpoint2 = 0.0;
-// The thermocouple each PID last computed from. 0 until the first closed-loop
-// pass, which then re-initialises the PIDs from their first input.
-static uint8_t appliedTc1 = 0;
-#if (RLHT_RELAY_COUNT >= 2)
-static uint8_t appliedTc2 = 0;
-#endif
 
 PID relay1PID(&pidInput1, &pidOutput1, &pidSetpoint1,
               slice.relayHeater1.Kp, slice.relayHeater1.Ki, slice.relayHeater1.Kd, DIRECT);
@@ -522,6 +516,14 @@ double selectedTemperature(uint8_t thermocoupleSelect)
     return (thermocoupleSelect == 2) ? slice.temperature2 : slice.temperature1;
 }
 
+volatile bool tcSelectChanged1 = false;
+volatile bool tcSelectChanged2 = false;
+
+bool thermocoupleSelectLocked(const RelayHeater &heater)
+{
+    return slice.mode == CLOSED_LOOP && heater.setpointTemperature > 0;
+}
+
 // Latch fault bits and hold the safe state the e-stop and the watchdog trip
 // hold: relays off, setpoints and on-times 0, PIDs in manual. The flag is set
 // in the same masked window, so the I2C handlers refuse from then on. Clearing
@@ -674,6 +676,8 @@ void relayControlLogic()
     double ki1 = slice.relayHeater1.Ki;
     double kd1 = slice.relayHeater1.Kd;
     uint8_t tc1 = slice.relayHeater1.thermocoupleSelect;
+    const bool tcChanged1 = tcSelectChanged1;
+    tcSelectChanged1 = false;
     interrupts();
 
     noInterrupts();
@@ -681,7 +685,24 @@ void relayControlLogic()
     double ki2 = slice.relayHeater2.Ki;
     double kd2 = slice.relayHeater2.Kd;
     uint8_t tc2 = slice.relayHeater2.thermocoupleSelect;
+    const bool tcChanged2 = tcSelectChanged2;
+    tcSelectChanged2 = false;
     interrupts();
+
+    // A select changes only while its heater is off or in open loop
+    // (thermocoupleSelectLocked()), so restarting from 0 drops no heating. A
+    // setpoint that landed since the change then starts the PID from the new
+    // sensor, as a returning setpoint does.
+    if (tcChanged1)
+    {
+        relay1PID.SetMode(MANUAL);
+        pidOutput1 = 0;
+    }
+    if (tcChanged2)
+    {
+        relay2PID.SetMode(MANUAL);
+        pidOutput2 = 0;
+    }
 
     // The snapshot is read, never written back: the command handlers own
     // mode, setpoints, gains, thermocouple selects and the open-loop on-times,
@@ -709,24 +730,9 @@ void relayControlLogic()
 
     if (localMode == CLOSED_LOOP)
     {
-        // A thermocouple select change swaps a PID's input to another sensor.
-        // Putting the PID in manual makes computeHeater()'s switch back to
-        // automatic re-initialise it from the new input and the current
-        // output, so the difference between the sensors isn't a step in the
-        // measurement for the derivative to kick on (feastorg/Slice_RLHT#54).
-        if (tc1 != appliedTc1)
-        {
-            relay1PID.SetMode(MANUAL);
-            appliedTc1 = tc1;
-        }
         computeHeater(relay1PID, pidSetpoint1, pidInput1, pidOutput1, sp1, selectedTemperature(tc1));
 
 #if (RLHT_RELAY_COUNT >= 2)
-        if (tc2 != appliedTc2)
-        {
-            relay2PID.SetMode(MANUAL);
-            appliedTc2 = tc2;
-        }
         computeHeater(relay2PID, pidSetpoint2, pidInput2, pidOutput2, sp2, selectedTemperature(tc2));
 #endif
 
