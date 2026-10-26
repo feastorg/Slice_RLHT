@@ -56,7 +56,9 @@ int main()
     refuses("R1TEMP=500.1", "Relay 1 setpoint: ", slice.relayHeater1.setpointTemperature == 500);
     host_check("R1TEMP=500.1 replies out of range", applied("Temp out of range (0-500C)"));
 
-    // Thermocouple select: 1 or 2.
+    // Thermocouple select: 1 or 2. Heater 1 off first: a heater heating in
+    // closed loop keeps its select (#54).
+    serial("R1TEMP=0");
     serial("R1TC=2");
     host_check("R1TC=2 is applied", applied("R1 TC: ") && slice.relayHeater1.thermocoupleSelect == 2);
     for (const char *line : {"R1TC=1junk", "R1TC=2.9", "R1TC="})

@@ -329,16 +329,34 @@ void handler_set_tc_select(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
         return;
     }
 
-    // Each channel is set if it is 1 or 2. A frame with a channel that is
-    // neither still sets the other, then is refused for the ignored one.
-    const bool tc1_ok = (v.tc1 == 1 || v.tc1 == 2);
-    const bool tc2_ok = (v.tc2 == 1 || v.tc2 == 2);
-    if (tc1_ok)
-        slice.relayHeater1.thermocoupleSelect = v.tc1;
-    if (tc2_ok)
-        slice.relayHeater2.thermocoupleSelect = v.tc2;
-    if (!tc1_ok || !tc2_ok)
-        (void)crumbs_refuse(ctx, BREAD_REFUSE_UNDEFINED_VALUE);
+    // Each channel is set if it is 1 or 2 and its heater isn't running from
+    // its thermocouple (thermocoupleSelectLocked()); resending the select in
+    // force changes nothing and is applied. A frame with a channel it can't
+    // set still sets the other, then is refused with the first ignored
+    // channel's reason.
+    uint8_t reason = 0;
+    const uint8_t want[2] = {v.tc1, v.tc2};
+    RelayHeater *const heater[2] = {&slice.relayHeater1, &slice.relayHeater2};
+    for (uint8_t i = 0; i < 2; i++)
+    {
+        uint8_t r = 0;
+        if (want[i] != 1 && want[i] != 2)
+            r = BREAD_REFUSE_UNDEFINED_VALUE;
+        else if (want[i] != heater[i]->thermocoupleSelect && thermocoupleSelectLocked(*heater[i]))
+            r = BREAD_REFUSE_WRONG_MODE;
+        else if (want[i] != heater[i]->thermocoupleSelect)
+        {
+            heater[i]->thermocoupleSelect = want[i];
+            if (i == 0)
+                tcSelectChanged1 = true;
+            else
+                tcSelectChanged2 = true;
+        }
+        if (r != 0 && reason == 0)
+            reason = r;
+    }
+    if (reason != 0)
+        (void)crumbs_refuse(ctx, reason);
 }
 
 void handler_set_open_duty(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)

@@ -20,7 +20,6 @@ struct RelayHeater
 {
     double setpointTemperature = 0.0;
     uint8_t thermocoupleSelect = 0;
-    double inputTemperature = 0.0;
     double relayOnTime = 0.0;
     uint16_t relayPeriod = 1000;
     double Kp = 1.0;
@@ -80,6 +79,21 @@ void updateStatusLed();
 void processEStop(bsc::EStop::Event e);
 void watchdogLogic();
 bool measureThermocouples();
+// The last reading of the thermocouple a select names: 2 is thermocouple 2,
+// anything else thermocouple 1.
+double selectedTemperature(uint8_t thermocoupleSelect);
+// True while a heater's PID runs from its thermocouple: closed loop with a
+// setpoint. Its select can't change then (feastorg/Slice_RLHT#54): the swap
+// reads as a step in the measurement, and PID_v1 can't re-initialise without
+// folding the P term into the integral. Call with interrupts masked, or from
+// the TWI ISR.
+bool thermocoupleSelectLocked(const RelayHeater &heater);
+// Set where a select change is stored, cleared by relayControlLogic(), which
+// restarts that heater's PID from 0 on the new sensor. A heater given a
+// setpoint before the next pass would otherwise compute its first sample
+// across the two sensors.
+extern volatile bool tcSelectChanged1;
+extern volatile bool tcSelectChanged2;
 void checkHeaterFaults();
 void relayControlLogic();
 void setRelayPeriod(uint8_t relayId, uint16_t periodMs);
