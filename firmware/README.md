@@ -19,6 +19,7 @@ At 115200 baud, one command per line. `HELP` (or `?`) lists them.
 | `R1PERIOD=<ms>`, `R2PERIOD=<ms>` | Relay period, 100-10000 ms |
 | `WDOG=<ms>` | Arm the command watchdog, or disarm it with 0 |
 | `WDCLEAR` | Clear a latched watchdog trip |
+| `FAULTCLEAR` | Clear latched heater faults |
 
 ## Command watchdog
 
@@ -55,18 +56,51 @@ controller or an operator sends a new setpoint or duty after the clear.
 A closed-loop heater given a setpoint then starts its PID from an
 on-time of 0.
 
+## Heater faults
+
+A heater fault (#48) latches and holds both heaters off the way a watchdog
+trip does: the relays go off, both setpoints and open-loop on-times go to 0,
+and both PIDs drop to manual. The checks run on every thermocouple reading,
+on the thermocouple each heater is set to (`R1TC=`/`R2TC=`):
+
+| Fault | When | Bit |
+| --- | --- | --- |
+| Over-temperature | the reading is above `RLHT_OVERTEMP_C` (525 C), in either mode | `RLHT_FAULT_H1_OVERTEMP` / `_H2_` |
+| No rise | closed loop with a setpoint: the PID output has stayed at or above `RLHT_NO_RISE_OUTPUT_PCT` (90 %) of the period for `RLHT_NO_RISE_MS` (120 s), and the temperature has risen less than `RLHT_NO_RISE_DELTA_C` (2 C) | `RLHT_FAULT_H1_NO_RISE` / `_H2_` |
+| Sensor | closed loop with a setpoint: `RLHT_SENSOR_FAULT_READS` (3) readings in a row of an open thermocouple | `RLHT_FAULT_H1_SENSOR` / `_H2_` |
+
+The values in brackets are starting points, not measurements; each is a
+build flag. The no-rise window has to be longer than the slowest healthy
+heat-up from cold at full output. A heater with no setpoint, or in open
+loop, can have its thermocouple unplugged without a fault. Gen1 boards check
+heater 1 only.
+
+`BREAD_OP_GET_FAULTS` reports the latched bits, and GET_STATE sets
+`RLHT_FLAG_FAULT` while any is latched. While one is latched, `SET_MODE`,
+`SET_SETPOINTS` and `SET_OPEN_DUTY` are refused with `BREAD_REFUSE_FAULT`,
+and the serial `MODE=`, `R1TEMP=`/`R2TEMP=` and `R1TIME=`/`R2TIME=` are
+ignored with a message. `BREAD_OP_CLEAR_FAULTS` (empty payload) or serial
+`FAULTCLEAR` clears every fault and resumes nothing; a condition that
+persists, such as an over-temperature, latches again on the next reading.
+GET_CAPS advertises `RLHT_CAP_FAULTS`.
+
+A firmware check supplements an independent thermal cutoff; it does not
+replace one.
+
 ## Refused commands
 
 A SET the firmware does not act on in full is refused with
 `crumbs_refuse()`, so CRUMBS's GET_ACK reports it refused, with a reason
 from bread-crumbs-contracts `bread_refuse.h`. GET_CAPS advertises
-`RLHT_CAP_REFUSES`, `RLHT_CAP_ESTOP_HOLD` and `RLHT_CAP_SETPOINT_LIMITS`.
+`RLHT_CAP_REFUSES`, `RLHT_CAP_ESTOP_HOLD`, `RLHT_CAP_SETPOINT_LIMITS` and
+`RLHT_CAP_FAULTS`.
 
 | Reason | When |
 | --- | --- |
-| `BREAD_REFUSE_MALFORMED` | the payload does not unpack; SET_WATCHDOG lacks its u16; CLEAR_WATCHDOG_TRIP carries a payload |
+| `BREAD_REFUSE_MALFORMED` | the payload does not unpack; SET_WATCHDOG lacks its u16; CLEAR_WATCHDOG_TRIP or CLEAR_FAULTS carries a payload |
 | `BREAD_REFUSE_ESTOP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while the hardware e-stop is held; this reason wins when a watchdog trip is held too |
-| `BREAD_REFUSE_WATCHDOG_TRIP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a trip is held |
+| `BREAD_REFUSE_WATCHDOG_TRIP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a trip is held; this reason wins over a latched fault |
+| `BREAD_REFUSE_FAULT` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a heater fault is latched |
 | `BREAD_REFUSE_UNDEFINED_VALUE` | SET_MODE other than open or closed loop; SET_TC_SELECT with a channel other than 1 or 2; SET_PERIODS outside `RLHT_PERIOD_MIN_MS`-`RLHT_PERIOD_MAX_MS` (100-10000 ms); SET_OPEN_DUTY above `RLHT_OPEN_DUTY_MAX_PCT` (100 %); SET_SETPOINTS above `RLHT_SETPOINT_MAX_C` (500 C, a build flag) |
 | `BREAD_REFUSE_WRONG_MODE` | SET_OPEN_DUTY outside open loop; SET_SETPOINTS outside closed loop |
 | `BREAD_REFUSE_UNKNOWN_OP` | an opcode that is not an RLHT or bread-common command, including a GET opcode sent as a command frame instead of through SET_REPLY |
@@ -75,8 +109,8 @@ A SET_TC_SELECT, SET_PERIODS or SET_OPEN_DUTY with one channel out of
 range still sets the other channel, then refuses. A SET_SETPOINTS with
 either setpoint above the ceiling stores neither. GET_STATE shows what took
 effect. A hold is checked before the payload is unpacked, so a malformed
-SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY sent while tripped or e-stopped
-reads the hold's reason. The serial `R1PERIOD=`/`R2PERIOD=` commands
+SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY sent during a hold reads the
+hold's reason. The serial `R1PERIOD=`/`R2PERIOD=` commands
 still clamp a period to the same range. Every valid frame refreshes the
 watchdog, a refused one included.
 

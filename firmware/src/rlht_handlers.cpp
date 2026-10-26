@@ -34,14 +34,17 @@ static_assert(RLHT_SETPOINT_MAX_C > 0 && RLHT_SETPOINT_MAX_C <= 3276,
 static const int16_t SETPOINT_MAX_DECI_C = RLHT_SETPOINT_MAX_C * 10;
 
 // 0 if no hold is in force, else the reason to refuse a heat-starting
-// command with (RLHT_CAP_ESTOP_HOLD). An e-stop wins over a watchdog trip:
-// clearing the trip does not lift the e-stop hold.
+// command with (RLHT_CAP_ESTOP_HOLD, RLHT_CAP_FAULTS). An e-stop wins over a
+// watchdog trip, and both over a latched fault: clearing one does not lift
+// the others.
 static uint8_t hold_refuse_reason()
 {
     if (estopInput.asserted())
         return BREAD_REFUSE_ESTOP;
     if (commandWatchdog.tripped())
         return BREAD_REFUSE_WATCHDOG_TRIP;
+    if (heaterFaults != 0)
+        return BREAD_REFUSE_FAULT;
     return 0;
 }
 
@@ -88,6 +91,36 @@ void handler_clear_watchdog_trip(crumbs_context_t *ctx, uint8_t opcode, const ui
     commandWatchdog.clear();
 }
 
+void handler_clear_faults(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
+{
+    (void)opcode;
+    (void)data;
+    (void)user_data;
+
+    // Empty, like CLEAR_WATCHDOG_TRIP: a frame with a payload is refused
+    // and the faults stay latched.
+    if (data_len != BREAD_FAULTS_CLEAR_PAYLOAD_LEN)
+    {
+        (void)crumbs_refuse(ctx, BREAD_REFUSE_MALFORMED);
+        return;
+    }
+
+    // BREAD_OP_CLEAR_FAULTS: an operator's acknowledgement that the cause is
+    // dealt with. Clears every fault and resumes nothing: the setpoints and
+    // on-times the latch zeroed are still 0. A condition that persists, such
+    // as an over-temperature, latches again on the next reading.
+    heaterFaults = 0;
+}
+
+void reply_get_faults(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
+{
+    (void)ctx;
+    (void)user_data;
+    (void)bread_faults_build_reply(reply, RLHT_TYPE_ID, heaterFaults);
+    // A reply build proves a live master too.
+    commandWatchdog.stamp(millis());
+}
+
 void reply_get_watchdog(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
 {
     uint16_t timeout_ms = commandWatchdog.timeoutMs();
@@ -107,8 +140,9 @@ void handler_set_mode(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data
     (void)opcode;
     (void)user_data;
 
-    // Refused while the watchdog is tripped or the e-stop is held, so nothing
-    // sent during a hold is stored and acted on when it ends. The trip and
+    // Refused while the watchdog is tripped, the e-stop is held or a fault
+    // is latched, so nothing sent during a hold is stored and acted on when
+    // it ends. The trip and
     // the press each set their flag in the same masked window that zeroes
     // the setpoints and on-times, so a frame either lands before it (a mode
     // it set is kept, its setpoints and duties are then zeroed) or sees it
@@ -148,8 +182,9 @@ void handler_set_setpoints(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
     (void)opcode;
     (void)user_data;
 
-    // Refused while the watchdog is tripped or the e-stop is held, so nothing
-    // sent during a hold is stored and acted on when it ends. The trip and
+    // Refused while the watchdog is tripped, the e-stop is held or a fault
+    // is latched, so nothing sent during a hold is stored and acted on when
+    // it ends. The trip and
     // the press each set their flag in the same masked window that zeroes
     // the setpoints and on-times, so a frame either lands before it (a mode
     // it set is kept, its setpoints and duties are then zeroed) or sees it
@@ -267,8 +302,9 @@ void handler_set_open_duty(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
     (void)opcode;
     (void)user_data;
 
-    // Refused while the watchdog is tripped or the e-stop is held, so nothing
-    // sent during a hold is stored and acted on when it ends. The trip and
+    // Refused while the watchdog is tripped, the e-stop is held or a fault
+    // is latched, so nothing sent during a hold is stored and acted on when
+    // it ends. The trip and
     // the press each set their flag in the same masked window that zeroes
     // the setpoints and on-times, so a frame either lands before it (a mode
     // it set is kept, its setpoints and duties are then zeroed) or sees it
@@ -332,6 +368,8 @@ void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_
 
     if (estopInput.asserted())
         flags |= RLHT_FLAG_ESTOP;
+    if (heaterFaults != 0)
+        flags |= RLHT_FLAG_FAULT;
     if (slice.relay1State)
         flags |= RLHT_FLAG_RELAY1_ON;
     if (slice.relay2State)
@@ -388,5 +426,6 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
     (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1,
                                  RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG |
                                      RLHT_CAP_CLEAR_WATCHDOG_TRIP | RLHT_CAP_ESTOP_COUNT |
-                                     RLHT_CAP_REFUSES | RLHT_CAP_ESTOP_HOLD | RLHT_CAP_SETPOINT_LIMITS);
+                                     RLHT_CAP_REFUSES | RLHT_CAP_ESTOP_HOLD | RLHT_CAP_SETPOINT_LIMITS |
+                                     RLHT_CAP_FAULTS);
 }

@@ -32,6 +32,12 @@ bsc::CommandWatchdog commandWatchdog;
 
 RLHT_SLICE slice;
 Timing timing = {0};
+volatile uint8_t heaterFaults = 0;
+
+static_assert(RLHT_OVERTEMP_C > RLHT_SETPOINT_MAX_C,
+              "RLHT_OVERTEMP_C must be above RLHT_SETPOINT_MAX_C, or a reachable setpoint faults");
+static_assert(RLHT_NO_RISE_OUTPUT_PCT > 0 && RLHT_NO_RISE_OUTPUT_PCT <= 100,
+              "RLHT_NO_RISE_OUTPUT_PCT must be 1 to 100");
 
 static ControlMode appliedMode = CLOSED_LOOP;
 static bool pidTuningsApplied = false;
@@ -237,7 +243,8 @@ void loop()
     processEStop(estopInput.poll(millis()));
     updateStatusLed();
     watchdogLogic();
-    measureThermocouples();
+    if (measureThermocouples())
+        checkHeaterFaults();
     relayControlLogic();
     serialCommands();
     printSerialOutput();
@@ -273,6 +280,7 @@ static bool is_command_op(uint8_t opcode)
     case RLHT_OP_SET_OPEN_DUTY:
     case BREAD_OP_SET_WATCHDOG:
     case BREAD_OP_CLEAR_WATCHDOG_TRIP:
+    case BREAD_OP_CLEAR_FAULTS:
         return true;
     default:
         return false;
@@ -362,6 +370,10 @@ void setupSlice()
     if (rc != 0)
         SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register BREAD_OP_CLEAR_WATCHDOG_TRIP"));
 
+    rc = crumbs_register_handler(&ctx, BREAD_OP_CLEAR_FAULTS, handler_clear_faults, nullptr);
+    if (rc != 0)
+        SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register BREAD_OP_CLEAR_FAULTS"));
+
     rc = crumbs_register_reply_handler(&ctx, 0x00, reply_version, nullptr);
     if (rc != 0)
         SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register version reply handler"));
@@ -377,6 +389,10 @@ void setupSlice()
     rc = crumbs_register_reply_handler(&ctx, BREAD_OP_GET_WATCHDOG, reply_get_watchdog, nullptr);
     if (rc != 0)
         SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register BREAD_OP_GET_WATCHDOG reply handler"));
+
+    rc = crumbs_register_reply_handler(&ctx, BREAD_OP_GET_FAULTS, reply_get_faults, nullptr);
+    if (rc != 0)
+        SLICE_DEBUG_PRINTLN(F("CRUMBS: Failed to register BREAD_OP_GET_FAULTS reply handler"));
 
 #ifdef RLHT_WATCHDOG_BOOT_MS
     // Integration opt-in: come up armed (e.g. e-stop wirings that power-cycle
@@ -481,14 +497,134 @@ void processEStop(bsc::EStop::Event e)
     }
 }
 
-void measureThermocouples()
+// True on a pass that took a new reading.
+bool measureThermocouples()
 {
     if (millis() - timing.lastThermoRead >= THERMO_UPDATE_TIME_MS)
     {
         slice.temperature1 = thermocouple1.readCelsius();
         slice.temperature2 = thermocouple2.readCelsius();
         timing.lastThermoRead += THERMO_UPDATE_TIME_MS;
+        return true;
     }
+    return false;
+}
+
+// Latch fault bits and hold the safe state the e-stop and the watchdog trip
+// hold: relays off, setpoints and on-times 0, PIDs in manual. The flag is set
+// in the same masked window, so the I2C handlers refuse from then on. Clearing
+// resumes nothing: the setpoints are 0 until new ones arrive, and a PID put
+// back in automatic starts from 0.
+static void latchFaults(uint8_t bits)
+{
+    noInterrupts();
+    heaterFaults |= bits;
+    slice.relayHeater1.setpointTemperature = 0;
+    slice.relayHeater2.setpointTemperature = 0;
+    slice.relayHeater1.relayOnTime = 0;
+    slice.relayHeater2.relayOnTime = 0;
+    slice.relay1State = false;
+    slice.relay2State = false;
+    interrupts();
+
+    relaysLow();
+    relay1PID.SetMode(MANUAL);
+    relay2PID.SetMode(MANUAL);
+    pidOutput1 = 0;
+    pidOutput2 = 0;
+    SLICE_DEBUG_PRINTLN(F("HEATER FAULT: relays off until FAULTCLEAR"));
+}
+
+// Per-heater state for the no-rise and sensor checks, main loop only.
+struct FaultWatch
+{
+    bool rising = false; // a no-rise window is open
+    unsigned long windowStart = 0;
+    double windowStartTemp = 0.0;
+    uint8_t nanReads = 0;
+};
+static FaultWatch watch1;
+static FaultWatch watch2;
+
+// The fault bits one heater sets this reading. `temp` is its thermocouple's
+// reading; `active` is true in closed loop with a setpoint and no hold, the
+// only state in which it depends on that reading.
+static uint8_t heaterFaultBits(FaultWatch &w, double temp, bool active, double output, uint16_t period,
+                               uint8_t overtempBit, uint8_t noRiseBit, uint8_t sensorBit)
+{
+    uint8_t bits = 0;
+
+    if (!isnan(temp) && temp > RLHT_OVERTEMP_C)
+        bits |= overtempBit;
+
+    if (active && isnan(temp))
+    {
+        if (w.nanReads < RLHT_SENSOR_FAULT_READS)
+            w.nanReads++;
+        if (w.nanReads >= RLHT_SENSOR_FAULT_READS)
+            bits |= sensorBit;
+    }
+    else
+    {
+        w.nanReads = 0;
+    }
+
+    // The window opens when the output reaches the threshold and restarts
+    // whenever the temperature has risen by the delta, so it faults only
+    // after RLHT_NO_RISE_MS at near-full output without that rise.
+    const double nearFull = (double)period * RLHT_NO_RISE_OUTPUT_PCT / 100.0;
+    if (active && !isnan(temp) && period > 0 && output >= nearFull)
+    {
+        const unsigned long now = millis();
+        if (!w.rising || temp - w.windowStartTemp >= RLHT_NO_RISE_DELTA_C)
+        {
+            w.rising = true;
+            w.windowStart = now;
+            w.windowStartTemp = temp;
+        }
+        else if (now - w.windowStart >= RLHT_NO_RISE_MS)
+        {
+            bits |= noRiseBit;
+        }
+    }
+    else
+    {
+        w.rising = false;
+    }
+
+    return bits;
+}
+
+// Runs on each new thermocouple reading (#48, RLHT_CAP_FAULTS).
+void checkHeaterFaults()
+{
+    noInterrupts();
+    const bool hold = estopInput.asserted() || commandWatchdog.tripped() || heaterFaults != 0;
+    const bool closed = (slice.mode == CLOSED_LOOP);
+    const double sp1 = slice.relayHeater1.setpointTemperature;
+    const double sp2 = slice.relayHeater2.setpointTemperature;
+    const uint8_t tc1 = slice.relayHeater1.thermocoupleSelect;
+    const uint8_t tc2 = slice.relayHeater2.thermocoupleSelect;
+    interrupts();
+
+    const double t1 = (tc1 == 2) ? slice.temperature2 : slice.temperature1;
+    uint8_t bits = heaterFaultBits(watch1, t1, closed && sp1 > 0 && !hold, pidOutput1,
+                                   slice.relayHeater1.relayPeriod,
+                                   RLHT_FAULT_H1_OVERTEMP, RLHT_FAULT_H1_NO_RISE, RLHT_FAULT_H1_SENSOR);
+#if (RLHT_RELAY_COUNT >= 2)
+    const double t2 = (tc2 == 2) ? slice.temperature2 : slice.temperature1;
+    bits |= heaterFaultBits(watch2, t2, closed && sp2 > 0 && !hold, pidOutput2,
+                            slice.relayHeater2.relayPeriod,
+                            RLHT_FAULT_H2_OVERTEMP, RLHT_FAULT_H2_NO_RISE, RLHT_FAULT_H2_SENSOR);
+#else
+    // Gen1 has no second heater to fault.
+    (void)sp2;
+    (void)tc2;
+    (void)watch2;
+#endif
+
+    if (bits != 0 && (bits & ~heaterFaults) != 0)
+        latchFaults(bits);
 }
 
 void relayControlLogic()
@@ -503,7 +639,7 @@ void relayControlLogic()
     // one window so a heater's tunings are never torn; a torn view across
     // windows self-corrects next iteration.
     noInterrupts();
-    bool localEStop = estopInput.asserted() || commandWatchdog.tripped();
+    bool localEStop = estopInput.asserted() || commandWatchdog.tripped() || heaterFaults != 0;
     ControlMode localMode = slice.mode;
     double sp1 = slice.relayHeater1.setpointTemperature;
     double sp2 = slice.relayHeater2.setpointTemperature;
@@ -530,8 +666,9 @@ void relayControlLogic()
     // and a write-back would overwrite a command that landed after the
     // snapshot (feastorg/Slice_RLHT#14).
 
-    // A tripped command watchdog holds the same safe state as e-stop until
-    // an explicit clear (CLEAR_WATCHDOG_TRIP or serial WDCLEAR).
+    // A tripped command watchdog or a latched fault holds the same safe state
+    // as e-stop until an explicit clear (CLEAR_WATCHDOG_TRIP or serial
+    // WDCLEAR; CLEAR_FAULTS or serial FAULTCLEAR).
     if (localEStop)
     {
         relaysLow();

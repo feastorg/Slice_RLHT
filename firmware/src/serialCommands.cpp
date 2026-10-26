@@ -26,8 +26,9 @@ static void strupper(char *s)
         *s = toupper((unsigned char)*s);
 }
 
-// Mode, setpoint and on-time commands are ignored while the e-stop is held
-// or the watchdog is tripped, as their CRUMBS counterparts are refused:
+// Mode, setpoint and on-time commands are ignored while the e-stop is held,
+// the watchdog is tripped or a heater fault is latched, as their CRUMBS
+// counterparts are refused:
 // nothing sent during a hold is stored and acted on when it ends.
 static bool refuse_while_held()
 {
@@ -39,6 +40,11 @@ static bool refuse_while_held()
     if (commandWatchdog.tripped())
     {
         Serial.println(F("Ignored: watchdog tripped, send WDCLEAR first"));
+        return true;
+    }
+    if (heaterFaults != 0)
+    {
+        Serial.println(F("Ignored: heater fault latched, send FAULTCLEAR first"));
         return true;
     }
     return false;
@@ -367,6 +373,14 @@ static void processCommand(char *cmd)
         commandWatchdog.clear();
         Serial.println(F("WDOG trip cleared"));
     }
+    else if (strcmp_P(cmd, PSTR("FAULTCLEAR")) == 0)
+    {
+        // The local operator's clear, as CLEAR_FAULTS: every latched fault
+        // and nothing else. Nothing heats until new setpoints or duties are
+        // sent, and a condition that persists latches again.
+        heaterFaults = 0;
+        Serial.println(F("Faults cleared"));
+    }
     else if (starts_with_P(cmd, PSTR("HELP")) || starts_with_P(cmd, PSTR("?")))
     {
         Serial.println(F("Commands:"));
@@ -383,6 +397,7 @@ static void processCommand(char *cmd)
         Serial.println(F("R2PERIOD=<val> - R2 period ms"));
         Serial.println(F("WDOG=<ms> - command watchdog (0=off)"));
         Serial.println(F("WDCLEAR - clear a watchdog trip"));
+        Serial.println(F("FAULTCLEAR - clear latched heater faults"));
     }
     else
     {

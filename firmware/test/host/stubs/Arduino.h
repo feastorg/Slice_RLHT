@@ -3,16 +3,20 @@
 #pragma once
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <ctype.h>
 #include <string>
+#include <type_traits>
 
 #define HIGH 1
 #define LOW 0
 #define INPUT 0
 #define OUTPUT 1
 #define INPUT_PULLUP 2
+#define DEC 10
+#define HEX 16
 
 unsigned long millis();
 void noInterrupts();
@@ -52,8 +56,26 @@ public:
     void println() { out += "\n"; }
     template <typename T> void print(T v) { out += std::to_string(v); }
     template <typename T> void println(T v) { out += std::to_string(v); out += "\n"; }
-    template <typename T> void print(T v, int) { out += std::to_string(v); }
-    template <typename T> void println(T v, int) { out += std::to_string(v); out += "\n"; }
+    // The second argument is a base for an integer (HEX is honoured) and a
+    // digit count for a float (ignored).
+    template <typename T> void print(T v, int base) { out += number(v, base); }
+    template <typename T> void println(T v, int base) { out += number(v, base); out += "\n"; }
+
+private:
+    template <typename T> static std::string number(T v, int base)
+    {
+        if constexpr (std::is_integral<T>::value)
+        {
+            if (base == HEX)
+            {
+                char buf[24];
+                snprintf(buf, sizeof buf, "%llX", (unsigned long long)v);
+                return buf;
+            }
+        }
+        (void)base;
+        return std::to_string(v);
+    }
 };
 
 // Bytes a test appends to in are what the firmware reads.

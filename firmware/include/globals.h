@@ -61,13 +61,18 @@ extern bsc::CommandWatchdog commandWatchdog;
 // The e-stop input (pin ESTOP): asserted() and count(), the latter for
 // RLHT_CAP_ESTOP_COUNT, are what the I2C handlers read.
 extern bsc::EStop estopInput;
+// Latched heater faults, RLHT_FAULT_* bits (#48). Set by the main loop,
+// cleared by CLEAR_FAULTS or serial FAULTCLEAR; nonzero holds both heaters
+// off and refuses mode, setpoint and duty commands.
+extern volatile uint8_t heaterFaults;
 
 void setupSlice();
 void setupRLHT();
 void updateStatusLed();
 void processEStop(bsc::EStop::Event e);
 void watchdogLogic();
-void measureThermocouples();
+bool measureThermocouples();
+void checkHeaterFaults();
 void relayControlLogic();
 void setRelayPeriod(uint8_t relayId, uint16_t periodMs);
 void actuateRelay(uint8_t relayPin, unsigned long &relayStart, unsigned long relayPeriod, unsigned long relayOnTime, bool &relayState);
@@ -83,9 +88,11 @@ void handler_set_tc_select(crumbs_context_t *ctx, uint8_t opcode, const uint8_t 
 void handler_set_open_duty(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data);
 void handler_set_watchdog(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data);
 void handler_clear_watchdog_trip(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data);
+void handler_clear_faults(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data);
 void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data);
 void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data);
 void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data);
 void reply_get_watchdog(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data);
+void reply_get_faults(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data);
 
 #endif // GLOBALS_H
