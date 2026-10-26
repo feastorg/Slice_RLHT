@@ -4,7 +4,7 @@
 // Hardware generation has no default: it selects the relay pin map, and a
 // wrong guess drives pins the board does not have (#27).
 #ifndef RLHT_HW_GEN
-#error "RLHT_HW_GEN is not set: build a gen* env from firmware/platformio.ini, pio run -e <env>, with the env for the board (docs/hardware-revisions.md)"
+#error "RLHT_HW_GEN is not set: build the board's env with pio run -e <env> (envs in firmware/platformio.ini, boards in docs/hardware-revisions.md)"
 #endif
 
 // Bus address is independent of hardware generation.

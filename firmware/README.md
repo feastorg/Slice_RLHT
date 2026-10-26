@@ -8,10 +8,11 @@ environment with `pio run -e <env>`; the environments are listed in
 The env must match the board's generation and MCU:
 [`docs/hardware-revisions.md`](../docs/hardware-revisions.md) maps each
 generation to its envs. A gen2 build on a gen1 board drives D5 and D7,
-which gen1 leaves unconnected, and reports a second heater that isn't
-there. A bare `pio run` builds `default_envs`, which is
-`gen2_nano`, so name the env when flashing:
-`pio run -e gen1_nano -t upload`.
+which gen1 leaves unconnected, and GET_STATE reports relay 2 and a
+channel-2 on-time as if a second heater were there. A bare `pio run`
+builds `default_envs`, which is `gen2_nano`, so name the env when
+flashing: `pio run -e <env> -t upload`, for example `-e gen1_nano` for
+the bench rig's gen1 Nano.
 
 ## Serial commands
 

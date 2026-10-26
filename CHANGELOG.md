@@ -59,6 +59,11 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Changed
 
+- **The firmware README says which env fits a board** (#32). It links
+  the generation-to-env map in `docs/hardware-revisions.md` and says to
+  name the env when flashing, since a bare `pio run` builds `gen2_nano`.
+  The missing-`RLHT_HW_GEN` error points there too, and no longer
+  suggests `gen2_nano`.
 - **Command opcodes come from the handler table** (feastorg/CRUMBS#124).
   `on_message` refuses UNKNOWN_OP any opcode without a registered handler,
   asked of CRUMBS with `crumbs_has_handler()`, in place of the hand-kept
