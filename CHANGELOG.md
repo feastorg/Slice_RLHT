@@ -62,11 +62,14 @@ This project did not use formal release tags through most of its history, so thi
 - **Command opcodes come from the handler table** (feastorg/CRUMBS#124).
   `on_message` refuses UNKNOWN_OP any opcode without a registered handler,
   asked of CRUMBS with `crumbs_has_handler()`, in place of the hand-kept
-  `is_command_op()` list. A command whose registration failed is now refused
-  instead of answering APPLIED with nothing behind it. Requires CRUMBS
+  `is_command_op()` list. A command with no handler is now refused instead
+  of answering APPLIED with nothing behind it: one whose registration
+  failed, or one that lands at boot between `crumbs_set_callbacks()` and its
+  registration. Requires CRUMBS
   `^0.17.0`. The gen1 Nano image grows by 12 B (22022 to 22034 B of flash).
-- Requires bread-crumbs-contracts `^0.11.0` (`firmware/platformio.ini` and
-  `slice.yaml`), the release that defines the setpoint limits (#47), the
+- Requires bread-crumbs-contracts `^0.11.1` (`firmware/platformio.ini` and
+  `slice.yaml`): 0.11.1 is the first to accept CRUMBS 0.17, and 0.11 the
+  release that defines the setpoint limits (#47), the
   heater faults (#48), the watchdog lease and the 12-byte SET_PID. It is
   additive: RLHT advertises none of the new flags yet, and the gen2 Nano and
   gen1 Nano Every images are the sizes benched on 0.10.0 (21548 and
