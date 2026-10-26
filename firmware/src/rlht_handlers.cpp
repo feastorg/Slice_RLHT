@@ -51,6 +51,7 @@ static uint8_t hold_refuse_reason()
 void handler_set_watchdog(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
 {
     uint16_t timeout_ms = 0;
+    uint8_t flags = 0;
     (void)opcode;
     (void)user_data;
 
@@ -59,6 +60,19 @@ void handler_set_watchdog(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *
         (void)crumbs_refuse(ctx, BREAD_REFUSE_MALFORMED);
         return;
     }
+    // The lease form (RLHT_CAP_WATCHDOG_LEASE): a third byte of flags. A flag
+    // this firmware does not define is refused and nothing is armed, so a
+    // controller never believes a lease it did not get.
+    if (data_len >= BREAD_WATCHDOG_SET_LEASE_PAYLOAD_LEN)
+    {
+        (void)crumbs_msg_read_u8(data, data_len, 2, &flags);
+        if ((flags & ~BREAD_WATCHDOG_FLAG_COMMANDS_ONLY) != 0)
+        {
+            (void)crumbs_refuse(ctx, BREAD_REFUSE_UNDEFINED_VALUE);
+            return;
+        }
+    }
+    watchdogCommandsOnly = (flags & BREAD_WATCHDOG_FLAG_COMMANDS_ONLY) != 0;
 
     // Arms, re-arms or disarms (0) and stamps liveness. It does not clear a
     // latched trip: re-arming is safe to send while tripped, and releasing
@@ -118,7 +132,7 @@ void reply_get_faults(crumbs_context_t *ctx, crumbs_message_t *reply, void *user
     (void)user_data;
     (void)bread_faults_build_reply(reply, RLHT_TYPE_ID, heaterFaults);
     // A reply build proves a live master too.
-    commandWatchdog.stamp(millis());
+    livenessStamp();
 }
 
 void reply_get_watchdog(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
@@ -131,7 +145,7 @@ void reply_get_watchdog(crumbs_context_t *ctx, crumbs_message_t *reply, void *us
                                      timeout_ms != 0 ? 1 : 0, timeout_ms,
                                      commandWatchdog.tripped() ? 1 : 0, commandWatchdog.tripCount());
     // A reply build proves a live master too.
-    commandWatchdog.stamp(millis());
+    livenessStamp();
 }
 
 void handler_set_mode(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data, uint8_t data_len, void *user_data)
@@ -347,7 +361,7 @@ void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_da
     (void)user_data;
     // Every reply build proves a live master (SET_REPLY staging frames are
     // not dispatched to on_message, so this is where poll traffic stamps).
-    commandWatchdog.stamp(millis());
+    livenessStamp();
     crumbs_build_version_reply(reply, RLHT_TYPE_ID, RLHT_MODULE_VER_MAJOR, RLHT_MODULE_VER_MINOR, RLHT_MODULE_VER_PATCH);
 }
 
@@ -360,7 +374,7 @@ void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_
     uint16_t on2 = 0;
 
     // The controller's periodic state poll is the primary liveness signal.
-    commandWatchdog.stamp(millis());
+    livenessStamp();
     double on1d = 0.0;
     double on2d = 0.0;
     (void)ctx;
@@ -422,10 +436,10 @@ void reply_get_caps(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_d
     (void)ctx;
     (void)user_data;
 
-    commandWatchdog.stamp(millis());
+    livenessStamp();
     (void)bread_caps_build_reply(reply, RLHT_TYPE_ID, RLHT_CAP_LEVEL_1,
                                  RLHT_CAP_BASELINE_FLAGS | RLHT_CAP_CMD_WATCHDOG |
                                      RLHT_CAP_CLEAR_WATCHDOG_TRIP | RLHT_CAP_ESTOP_COUNT |
                                      RLHT_CAP_REFUSES | RLHT_CAP_ESTOP_HOLD | RLHT_CAP_SETPOINT_LIMITS |
-                                     RLHT_CAP_FAULTS);
+                                     RLHT_CAP_FAULTS | RLHT_CAP_WATCHDOG_LEASE);
 }

@@ -58,6 +58,14 @@ extern PID relay2PID;
 // setpoint and duty commands are ignored while it is set. From
 // bread-slice-core: arm(), stamp() and clear() are ISR-safe.
 extern bsc::CommandWatchdog commandWatchdog;
+// The lease (RLHT_CAP_WATCHDOG_LEASE): set by a 3-byte SET_WATCHDOG with
+// BREAD_WATCHDOG_FLAG_COMMANDS_ONLY, cleared by the 2-byte form and serial
+// WDOG=. While set, only SET_MODE, SET_SETPOINTS, SET_OPEN_DUTY and
+// SET_WATCHDOG refresh the watchdog.
+extern volatile bool watchdogCommandsOnly;
+// Refreshes the watchdog for a reply, a non-actuating frame or a serial line:
+// unless the lease is commands-only.
+void livenessStamp();
 // The e-stop input (pin ESTOP): asserted() and count(), the latter for
 // RLHT_CAP_ESTOP_COUNT, are what the I2C handlers read.
 extern bsc::EStop estopInput;

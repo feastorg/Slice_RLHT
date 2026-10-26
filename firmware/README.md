@@ -29,6 +29,16 @@ The watchdog boots disarmed unless the build defines
 arrived within the timeout. A trip turns both relays off and zeroes both
 setpoints and open-loop on-times.
 
+A controller can arm it as a lease instead (`RLHT_CAP_WATCHDOG_LEASE`): a
+3-byte `SET_WATCHDOG`, `[timeout_ms:u16][flags:u8]`, with
+`BREAD_WATCHDOG_FLAG_COMMANDS_ONLY`. Then only `SET_MODE`, `SET_SETPOINTS`,
+`SET_OPEN_DUTY` and `SET_WATCHDOG` refresh it; replies, other commands and
+serial lines do not, so a status poller that outlives the control path no
+longer keeps the heaters on. The control path re-sends `SET_WATCHDOG` as its
+keepalive. The 2-byte form and serial `WDOG=` end the lease. A flag this
+firmware does not define is refused `BREAD_REFUSE_UNDEFINED_VALUE` and arms
+nothing.
+
 The trip latches. Only these clear it:
 
 - `BREAD_OP_CLEAR_WATCHDOG_TRIP` (0x7C) over I2C, with an empty
@@ -101,7 +111,7 @@ from bread-crumbs-contracts `bread_refuse.h`. GET_CAPS advertises
 | `BREAD_REFUSE_ESTOP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while the hardware e-stop is held; this reason wins when a watchdog trip is held too |
 | `BREAD_REFUSE_WATCHDOG_TRIP` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a trip is held; this reason wins over a latched fault |
 | `BREAD_REFUSE_FAULT` | SET_MODE, SET_SETPOINTS or SET_OPEN_DUTY while a heater fault is latched |
-| `BREAD_REFUSE_UNDEFINED_VALUE` | SET_MODE other than open or closed loop; SET_TC_SELECT with a channel other than 1 or 2; SET_PERIODS outside `RLHT_PERIOD_MIN_MS`-`RLHT_PERIOD_MAX_MS` (100-10000 ms); SET_OPEN_DUTY above `RLHT_OPEN_DUTY_MAX_PCT` (100 %); SET_SETPOINTS above `RLHT_SETPOINT_MAX_C` (500 C, a build flag) |
+| `BREAD_REFUSE_UNDEFINED_VALUE` | SET_MODE other than open or closed loop; a SET_WATCHDOG flag other than `BREAD_WATCHDOG_FLAG_COMMANDS_ONLY`; SET_TC_SELECT with a channel other than 1 or 2; SET_PERIODS outside `RLHT_PERIOD_MIN_MS`-`RLHT_PERIOD_MAX_MS` (100-10000 ms); SET_OPEN_DUTY above `RLHT_OPEN_DUTY_MAX_PCT` (100 %); SET_SETPOINTS above `RLHT_SETPOINT_MAX_C` (500 C, a build flag) |
 | `BREAD_REFUSE_WRONG_MODE` | SET_OPEN_DUTY outside open loop; SET_SETPOINTS outside closed loop |
 | `BREAD_REFUSE_UNKNOWN_OP` | an opcode that is not an RLHT or bread-common command, including a GET opcode sent as a command frame instead of through SET_REPLY |
 
