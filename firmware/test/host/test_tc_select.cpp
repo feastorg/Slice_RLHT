@@ -63,6 +63,25 @@ int main()
 
     host_tc1_celsius = 200.0f;
     host_tc2_celsius = 100.0f;
+
+    // ---- Open loop: selects change freely, and the status line shows the
+    // selected reading.
+    const uint8_t open = RLHT_MODE_OPEN_LOOP;
+    host_send(RLHT_TYPE_ID, RLHT_OP_SET_MODE, &open, 1);
+    (void)host_read_ack();
+    send_tc_select(2, 1);
+    host_check("SET_TC_SELECT in open loop is applied", applied());
+    readings(1);
+    Serial.out.clear();
+    printSliceState(Serial);
+    host_check("the status line shows the selected reading in open loop",
+               Serial.out.find("Relay1Input:100.00") != std::string::npos);
+    send_tc_select(1, 2);
+    (void)host_read_ack();
+    const uint8_t closed = RLHT_MODE_CLOSED_LOOP;
+    host_send(RLHT_TYPE_ID, RLHT_OP_SET_MODE, &closed, 1);
+    (void)host_read_ack();
+
     const uint8_t pid[6] = {0, 0, 255, 0, 0, 255}; // Kd 25.5, u8 x10
     host_send(RLHT_TYPE_ID, RLHT_OP_SET_PID, pid, 6);
     host_check("SET_PID is applied", applied());
@@ -138,19 +157,6 @@ int main()
     loop();
     host_check("serial R1TC= with the select in force is accepted",
                Serial.out.find("R1 TC: 2") != std::string::npos);
-
-    // ---- Open loop: selects change freely, and the status line shows the
-    // selected reading.
-    const uint8_t open = RLHT_MODE_OPEN_LOOP;
-    host_send(RLHT_TYPE_ID, RLHT_OP_SET_MODE, &open, 1);
-    (void)host_read_ack();
-    send_tc_select(1, 2);
-    host_check("SET_TC_SELECT in open loop is applied", applied());
-    readings(1);
-    Serial.out.clear();
-    printSliceState(Serial);
-    host_check("the status line shows the selected reading in open loop",
-               Serial.out.find("Relay1Input:200.00") != std::string::npos);
 
     return host_finish();
 }
