@@ -1,0 +1,173 @@
+## gen2 Nano, 236a0c2, env gen2_nano, 2026-10-25
+
+(first queries landed during the boot wait: EIO; a scan then found 0x13)
+
+$ ssh <controller> 'cd rlht-bench && for c in version caps state wdog faults; do ../dcmt-bench/venv/bin/python rlht_bench.py $c 2>&1 | tail -1; done'
+22:35:47.695 Version(crumbs_version=1602, major=1, minor=0, patch=0)
+22:35:48.012 caps 0101ff7f0000
+22:35:48.314 state mode=0 estop=0 fault=0 relays=0,0 t=22.3,21.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:35:48.615 wdog [armed][timeout_ms][tripped][trips] 0000000000
+22:35:48.918 faults 0x00 none
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B mode 1 && $B sp 40 0 && $B mode 0 && $B sp 500.1 0 && $B state && $B sp 40 0 && sleep 1.2 && $B state && $B sp 0 0 && sleep 1.2 && $B state'
+22:36:04.610 sent 0x01 01 -> ack Ack(counter=1, opcode=1, status=1, reason=0)
+22:36:04.923 sent 0x02 90010000 -> ack Ack(counter=2, opcode=2, status=2, reason=6)
+22:36:05.236 sent 0x01 00 -> ack Ack(counter=3, opcode=1, status=1, reason=0)
+22:36:05.549 sent 0x02 89130000 -> ack Ack(counter=4, opcode=2, status=2, reason=4)
+22:36:05.851 state mode=0 estop=0 fault=0 relays=0,0 t=22.0,21.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:36:06.163 sent 0x02 90010000 -> ack Ack(counter=5, opcode=2, status=1, reason=0)
+22:36:07.667 state mode=0 estop=0 fault=0 relays=0,0 t=22.8,21.5 sp=40.0,0.0 on=17,0 period=1000,1000 tc=1,2 estop_count=0
+22:36:07.980 sent 0x02 00000000 -> ack Ack(counter=6, opcode=2, status=1, reason=0)
+22:36:09.506 state mode=0 estop=0 fault=0 relays=0,0 t=23.0,21.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+
+(F1: thermocouple 1 unplugged during the watch; an arm rested on thermocouple 2 near 22:37:30)
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B mode 0 && $B sp 40 0 && $B watch 16 && $B faults'
+22:37:21.272 sent 0x01 00 -> ack Ack(counter=7, opcode=1, status=1, reason=0)
+22:37:21.586 sent 0x02 90010000 -> ack Ack(counter=8, opcode=2, status=1, reason=0)
+22:37:21.904 state mode=0 estop=0 fault=0 relays=0,0 t=22.8,22.3 sp=40.0,0.0 on=17,0 period=1000,1000 tc=1,2 estop_count=0
+22:37:29.987 state mode=0 estop=0 fault=0 relays=0,0 t=23.3,30.3 sp=40.0,0.0 on=16,0 period=1000,1000 tc=1,2 estop_count=0
+22:37:30.440 state mode=0 estop=0 fault=0 relays=0,0 t=23.0,30.3 sp=40.0,0.0 on=17,0 period=1000,1000 tc=1,2 estop_count=0
+22:37:31.328 state mode=0 estop=0 fault=0 relays=0,0 t=23.3,30.3 sp=40.0,0.0 on=16,0 period=1000,1000 tc=1,2 estop_count=0
+22:37:32.869 state mode=0 estop=0 fault=0 relays=0,0 t=23.0,30.3 sp=40.0,0.0 on=17,0 period=1000,1000 tc=1,2 estop_count=0
+22:37:36.587 state mode=0 estop=0 fault=1 relays=0,0 t=547.8,30.3 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:37:37.910 wdog [armed][timeout_ms][tripped][trips] 0000000000
+22:37:37.928 faults 0x01 H1_OVERTEMP
+22:37:38.258 faults 0x01 H1_OVERTEMP
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B sp 40 0 && $B mode 1 && $B duty 50 50 && $B raw 0x7B 00 && $B faults && $B state'
+22:37:57.985 sent 0x02 90010000 -> ack Ack(counter=9, opcode=2, status=2, reason=8)
+22:37:58.297 sent 0x01 01 -> ack Ack(counter=10, opcode=1, status=2, reason=8)
+22:37:58.608 sent 0x06 3232 -> ack Ack(counter=11, opcode=6, status=2, reason=8)
+22:37:58.920 sent 0x7B 00 -> ack Ack(counter=12, opcode=123, status=2, reason=1)
+22:37:59.221 faults 0x01 H1_OVERTEMP
+22:37:59.523 state mode=0 estop=0 fault=1 relays=0,0 t=-3276.8,23.3 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+
+$ ssh <controller> 'cd rlht-bench && for i in 1 2 3 4; do ../dcmt-bench/venv/bin/python rlht_bench.py state; sleep 1; done; ../dcmt-bench/venv/bin/python rlht_bench.py faults'
+22:39:05.133 state mode=0 estop=0 fault=1 relays=0,0 t=-3276.8,23.0 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:39:06.435 state mode=0 estop=0 fault=1 relays=0,0 t=-3276.8,23.3 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:39:07.737 state mode=0 estop=0 fault=1 relays=0,0 t=-3276.8,22.5 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:39:09.039 state mode=0 estop=0 fault=1 relays=0,0 t=-3276.8,22.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:39:10.396 faults 0x01 H1_OVERTEMP
+
+(thermocouple 1 plugged back in)
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B state && sleep 1 && $B state && $B fclear && $B faults && sleep 1.5 && $B state && $B faults'
+22:40:17.597 state mode=0 estop=0 fault=1 relays=0,0 t=22.8,23.0 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:40:18.901 state mode=0 estop=0 fault=1 relays=0,0 t=23.0,22.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:40:19.214 sent 0x7B  -> ack Ack(counter=13, opcode=123, status=1, reason=0)
+22:40:19.515 faults 0x00 none
+22:40:21.318 state mode=0 estop=0 fault=0 relays=0,0 t=23.0,23.0 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:40:21.618 faults 0x00 none
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B pid 10 0 0 && $B mode 0 && $B sp 400 0 && $B watch 135'
+22:40:47.799 sent 0x03 102700000000102700000000 -> ack Ack(counter=14, opcode=3, status=1, reason=0)
+22:40:48.112 sent 0x01 00 -> ack Ack(counter=15, opcode=1, status=1, reason=0)
+22:40:48.426 sent 0x02 a00f0000 -> ack Ack(counter=16, opcode=2, status=1, reason=0)
+22:40:48.745 state mode=0 estop=0 fault=0 relays=1,0 t=23.5,23.0 sp=400.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:41:18.844 state mode=0 estop=0 fault=0 relays=1,0 t=23.3,23.0 sp=400.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:41:19.079 state mode=0 estop=0 fault=0 relays=1,0 t=23.3,23.0 sp=400.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:41:25.625 state mode=0 estop=0 fault=0 relays=1,0 t=23.3,22.8 sp=400.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:41:25.861 state mode=0 estop=0 fault=0 relays=1,0 t=23.5,23.0 sp=400.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:42:16.855 state mode=0 estop=0 fault=0 relays=1,0 t=23.8,23.3 sp=400.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:42:17.090 state mode=0 estop=0 fault=0 relays=1,0 t=23.8,23.5 sp=400.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:42:48.695 state mode=0 estop=0 fault=1 relays=0,0 t=24.0,23.3 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:43:03.816 wdog [armed][timeout_ms][tripped][trips] 0000000000
+22:43:03.833 faults 0x02 H1_NO_RISE
+
+(F3: thermocouple 2 was not unplugged)
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B fclear && $B pid6 1 0 0 && $B mode 1 && $B duty 100 0 && $B watch 20; $B duty 0 0; $B state; $B faults'
+22:43:55.165 sent 0x7B  -> ack Ack(counter=17, opcode=123, status=1, reason=0)
+22:43:55.481 sent 0x03 0a00000a0000 -> ack Ack(counter=18, opcode=3, status=1, reason=0)
+22:43:55.796 sent 0x01 01 -> ack Ack(counter=19, opcode=1, status=1, reason=0)
+22:43:56.109 sent 0x06 6400 -> ack Ack(counter=20, opcode=6, status=1, reason=0)
+22:43:56.429 state mode=1 estop=0 fault=0 relays=1,0 t=23.8,24.3 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:44:16.483 wdog [armed][timeout_ms][tripped][trips] 0000000000
+22:44:16.500 faults 0x00 none
+22:44:16.857 sent 0x06 0000 -> ack Ack(counter=21, opcode=6, status=1, reason=0)
+22:44:17.162 state mode=1 estop=0 fault=0 relays=0,0 t=24.3,24.0 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:44:17.466 faults 0x00 none
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B mode 1 && $B duty 100 100 && $B wdl 1000 1 && $B watch 3; $B wd 0; $B clear; $B wdog; $B duty 100 100 && $B wd 1000 && $B watch 3; $B wd 0; $B duty 0 0; $B wdl 1000 2; $B wdog; $B state'
+22:44:43.234 sent 0x01 01 -> ack Ack(counter=22, opcode=1, status=1, reason=0)
+22:44:43.550 sent 0x06 6464 -> ack Ack(counter=23, opcode=6, status=1, reason=0)
+22:44:43.866 sent 0x7E e80301 -> ack Ack(counter=24, opcode=126, status=1, reason=0)
+22:44:44.187 state mode=1 estop=0 fault=0 relays=1,1 t=23.5,23.8 sp=0.0,0.0 on=1000,1000 period=1000,1000 tc=1,2 estop_count=0
+22:44:45.074 state mode=1 estop=0 fault=0 relays=0,0 t=23.5,23.3 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:44:47.249 wdog [armed][timeout_ms][tripped][trips] 01e8030101
+22:44:47.266 faults 0x00 none
+22:44:47.581 sent 0x7E 0000 -> ack Ack(counter=25, opcode=126, status=1, reason=0)
+22:44:47.898 sent 0x7C  -> ack Ack(counter=26, opcode=124, status=1, reason=0)
+22:44:48.242 wdog [armed][timeout_ms][tripped][trips] 0000000001
+22:44:48.557 sent 0x06 6464 -> ack Ack(counter=27, opcode=6, status=1, reason=0)
+22:44:48.873 sent 0x7E e803 -> ack Ack(counter=28, opcode=126, status=1, reason=0)
+22:44:49.194 state mode=1 estop=0 fault=0 relays=1,1 t=23.3,23.5 sp=0.0,0.0 on=1000,1000 period=1000,1000 tc=1,2 estop_count=0
+22:44:52.238 wdog [armed][timeout_ms][tripped][trips] 01e8030001
+22:44:52.255 faults 0x00 none
+22:44:52.570 sent 0x7E 0000 -> ack Ack(counter=29, opcode=126, status=1, reason=0)
+22:44:52.886 sent 0x06 0000 -> ack Ack(counter=30, opcode=6, status=1, reason=0)
+22:44:53.202 sent 0x7E e80302 -> ack Ack(counter=31, opcode=126, status=2, reason=4)
+22:44:53.525 wdog [armed][timeout_ms][tripped][trips] 0000000001
+22:44:53.830 state mode=1 estop=0 fault=0 relays=0,0 t=24.0,23.5 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+
+(USB from the board to the controller; prep's port open resets the board)
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B prep && sleep 4 && $B state && $B pid 50 0.125 1.003 && $B raw 0x03 50c30000000050c3000000000000 && $B ser READ'
+22:46:04.683 /dev/ttyUSB0: hupcl off
+22:46:08.990 state mode=0 estop=0 fault=0 relays=0,0 t=23.8,23.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:46:09.307 sent 0x03 50c37d00eb0350c37d00eb03 -> ack Ack(counter=1, opcode=3, status=1, reason=0)
+22:46:09.676 sent 0x03 50c30000000050c3000000000000 -> ack Ack(counter=2, opcode=3, status=2, reason=1)
+22:46:10.127 > READ
+22:46:10.327 < Invalid cmd! Type HELP
+
+(nobody touched the rig between here and the next run; the fault was already latched when it started)
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B mode 0 && $B sp 40 0 && for i in 1 2 ... 50; do $B state; sleep 0.2; done; $B faults'
+22:49:34.131 sent 0x01 00 -> ack Ack(counter=3, opcode=1, status=2, reason=8)
+22:49:34.447 sent 0x02 90010000 -> ack Ack(counter=4, opcode=2, status=2, reason=8)
+22:49:34.752 state mode=0 estop=0 fault=1 relays=0,0 t=23.8,23.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+(49 more reads to 22:49:59.622, all fault=1, relays 0,0, t1 23.3 to 24.0, t2 23.5 to 24.3)
+22:50:00.128 faults 0x01 H1_OVERTEMP
+
+$ ssh <controller> (fclear, then 60 state reads 0.3 s apart, printing only a read with a fault or a temperature outside 20.0 to 29.9)
+22:51:04.895 sent 0x7B  -> ack Ack(counter=5, opcode=123, status=1, reason=0)
+22:51:05.199 faults 0x00 none
+22:51:42.158 faults 0x00 none
+22:51:42.463 state mode=0 estop=0 fault=0 relays=0,0 t=23.8,23.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+
+## F4: 236a0c2 with -DRLHT_OVERTEMP_C=30 -DRLHT_SETPOINT_MAX_C=25 in platformio.ini
+
+(thermocouple 1 pinched by hand during the stream)
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B faults && $B mode 0 && $B sp 26 0 && $B mode 1 && $B duty 100 0 && for i in ...; do $B state; sleep 0.2; done; $B faults'
+22:56:59.022 faults 0x00 none
+22:56:59.337 sent 0x01 00 -> ack Ack(counter=1, opcode=1, status=1, reason=0)
+22:56:59.653 sent 0x02 04010000 -> ack Ack(counter=2, opcode=2, status=2, reason=4)
+22:56:59.970 sent 0x01 01 -> ack Ack(counter=3, opcode=1, status=1, reason=0)
+22:57:00.283 sent 0x06 6400 -> ack Ack(counter=4, opcode=6, status=1, reason=0)
+22:57:00.589 state mode=1 estop=0 fault=0 relays=1,0 t=25.8,22.8 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:01.096 state mode=1 estop=0 fault=0 relays=1,0 t=25.3,23.0 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:01.603 state mode=1 estop=0 fault=0 relays=1,0 t=25.5,22.5 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:02.108 state mode=1 estop=0 fault=0 relays=1,0 t=25.5,22.8 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:02.613 state mode=1 estop=0 fault=0 relays=1,0 t=25.3,23.3 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:03.118 state mode=1 estop=0 fault=0 relays=1,0 t=25.5,23.0 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:03.623 state mode=1 estop=0 fault=0 relays=1,0 t=25.8,23.3 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:04.159 state mode=1 estop=0 fault=0 relays=1,0 t=26.3,23.0 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:04.665 state mode=1 estop=0 fault=0 relays=1,0 t=28.0,22.8 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:05.171 state mode=1 estop=0 fault=0 relays=1,0 t=28.3,23.0 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:05.677 state mode=1 estop=0 fault=0 relays=1,0 t=29.0,22.8 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:06.184 state mode=1 estop=0 fault=0 relays=1,0 t=30.0,23.0 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:06.689 state mode=1 estop=0 fault=0 relays=1,0 t=29.5,23.0 sp=0.0,0.0 on=1000,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:07.194 state mode=1 estop=0 fault=1 relays=0,0 t=30.3,22.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:07.701 state mode=1 estop=0 fault=1 relays=0,0 t=30.8,22.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+(56 more reads to 22:57:35.666, all fault=1, relays 0,0, t1 rising to 34.5)
+22:57:36.174 faults 0x01 H1_OVERTEMP
+
+$ ssh <controller> 'cd rlht-bench && B="../dcmt-bench/venv/bin/python rlht_bench.py" && $B state && $B fclear && $B faults && $B state && sleep 0.5 && $B state && $B faults'
+22:57:46.722 state mode=1 estop=0 fault=1 relays=0,0 t=34.8,22.5 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:47.036 sent 0x7B  -> ack Ack(counter=5, opcode=123, status=1, reason=0)
+22:57:47.340 faults 0x01 H1_OVERTEMP
+22:57:47.643 state mode=1 estop=0 fault=1 relays=0,0 t=34.0,22.8 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:48.449 state mode=1 estop=0 fault=1 relays=0,0 t=34.5,22.5 sp=0.0,0.0 on=0,0 period=1000,1000 tc=1,2 estop_count=0
+22:57:48.753 faults 0x01 H1_OVERTEMP
