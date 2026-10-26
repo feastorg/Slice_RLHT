@@ -259,6 +259,15 @@ void loop()
     printSerialOutput();
 }
 
+// The commands that keep a commands-only lease alive: the ones that start or
+// change heating. SET_WATCHDOG, the lease's keepalive, refreshes it through
+// arm() in its handler.
+static bool is_actuating_op(uint8_t opcode)
+{
+    return opcode == RLHT_OP_SET_MODE || opcode == RLHT_OP_SET_SETPOINTS ||
+           opcode == RLHT_OP_SET_OPEN_DUTY;
+}
+
 // Fires for every CRC-valid inbound command frame (SET_REPLY excluded by
 // CRUMBS): any valid command proves a live master, so it stamps liveness.
 // It does not clear a trip (feastorg/Slice_RLHT#9). The trip latches until
@@ -273,43 +282,17 @@ void loop()
 // refused here; CRUMBS cannot reject it itself, since on_message takes every
 // frame.
 //
-// The commands are the opcodes setupSlice() registers a handler for, listed
-// by hand: the contract's opcode tables also hold the GET opcodes, which are
-// queries answered through SET_REPLY. A GET opcode sent as a command frame
-// has nothing behind it, and read APPLIED before (feastorg/Slice_RLHT#36).
-static bool is_command_op(uint8_t opcode)
-{
-    switch (opcode)
-    {
-    case RLHT_OP_SET_MODE:
-    case RLHT_OP_SET_SETPOINTS:
-    case RLHT_OP_SET_PID:
-    case RLHT_OP_SET_PERIODS:
-    case RLHT_OP_SET_TC_SELECT:
-    case RLHT_OP_SET_OPEN_DUTY:
-    case BREAD_OP_SET_WATCHDOG:
-    case BREAD_OP_CLEAR_WATCHDOG_TRIP:
-    case BREAD_OP_CLEAR_FAULTS:
-        return true;
-    default:
-        return false;
-    }
-}
-
-// The commands that keep a commands-only lease alive: the ones that start or
-// change heating. SET_WATCHDOG, the lease's keepalive, refreshes it through
-// arm() in its handler.
-static bool is_actuating_op(uint8_t opcode)
-{
-    return opcode == RLHT_OP_SET_MODE || opcode == RLHT_OP_SET_SETPOINTS ||
-           opcode == RLHT_OP_SET_OPEN_DUTY;
-}
-
+// The commands are the opcodes setupSlice() registers a command handler for,
+// and crumbs_has_handler() reads them from those registrations. The
+// contract's opcode tables also hold the GET opcodes, which are queries
+// registered as reply handlers and answered through SET_REPLY. A GET opcode
+// sent as a command frame has nothing behind it, and read APPLIED before
+// (feastorg/Slice_RLHT#36).
 static void on_crumbs_message(crumbs_context_t *c, const crumbs_message_t *msg)
 {
     if (!watchdogCommandsOnly || is_actuating_op(msg->opcode))
         commandWatchdog.stamp(millis());
-    if (!is_command_op(msg->opcode))
+    if (!crumbs_has_handler(c, msg->opcode))
         (void)crumbs_refuse(c, BREAD_REFUSE_UNKNOWN_OP);
 }
 

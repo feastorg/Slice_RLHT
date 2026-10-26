@@ -59,6 +59,13 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Changed
 
+- Requires CRUMBS `^0.17.0` (`firmware/platformio.ini` and `slice.yaml`).
+  `on_crumbs_message` refuses an opcode with `UNKNOWN_OP` when
+  `crumbs_has_handler()` finds no command handler registered for it, in
+  place of a hand-kept list of the same nine opcodes (#36). The refused
+  set is unchanged; a command added later is accepted once it is
+  registered. bread-crumbs-contracts 0.11.1 accepts CRUMBS 0.17, and the
+  `^0.11.0` pin takes it.
 - Requires bread-crumbs-contracts `^0.11.0` (`firmware/platformio.ini` and
   `slice.yaml`), the release that defines the setpoint limits (#47), the
   heater faults (#48), the watchdog lease and the 12-byte SET_PID. It is
