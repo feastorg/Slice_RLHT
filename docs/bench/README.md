@@ -34,3 +34,4 @@ in bread-infra.
 | 2026-10-24 | [bread-slice-core, serial burst and strict parsing](2026-10-24-core-and-serial.md) | `03089e1` | gen2 Nano, gen1 Nano Every | pass |
 | 2026-10-25 | [Setpoint limits, heater faults, the lease and wide gains](2026-10-25-faults-lease-pid.md) | `236a0c2` | gen2 Nano | pass; open-thermocouple fault not reached, F3 skipped, P2 not checked; two spurious over-temperature latches |
 | 2026-10-31 | [Opcode refusal, the fault latches and cut-short replies](2026-10-31-refusal-latch-bus.md) | `d0e6ced` | gen2 Nano | pass; 2 to 4 % of GET_STATE replies cut short (#81) |
+| 2026-11-01 | [PID timing, the tc-select lock, amber, and the #81 bisect](2026-11-01-pid-tcsel-amber-bisect.md) | `a251158` | gen2 Nano | pass; #81 traced to the loop's masked windows |
