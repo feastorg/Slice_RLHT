@@ -132,6 +132,10 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **Host tests rebuild after a library pin change** (#74). `pio pkg
+  install` keeps a release archive's mtimes, so a plain `make -C test/host`
+  kept linking objects built from the previous CRUMBS. A stamp of the
+  installed library versions now rebuilds them.
 - **SET_PID takes exactly 6 bytes** (#50). `rlht_set_pid_unpack` accepts
   trailing bytes, so a widened SET_PID, such as the u16 x1000 one
   bread-crumbs-contracts#64 proposes, was read as u8 x10 gains and applied.
