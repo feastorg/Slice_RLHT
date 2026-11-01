@@ -47,6 +47,7 @@ the board. `make` exits non-zero if any check fails.
 | `test_tc_select.cpp` | A heater's thermocouple select can't change while it heats in closed loop: SET_TC_SELECT is refused `WRONG_MODE` for that channel and applies the other, resending the select in force is applied, serial `R1TC=` is ignored; with the setpoint at 0 it changes, and the heater restarts on the new sensor with no derivative kick and no P term carried over (#54). The serial status line shows the selected reading in open loop (#28) |
 | `test_set_pid_length.cpp` | SET_PID takes 6 bytes (u8 x10) and 12 bytes (u16 x1000, up to 65.535, `RLHT_CAP_PID_X1000`); 5, 7, 11 and 13 bytes are refused `MALFORMED` and change no gain (#50, bread-crumbs-contracts#64) |
 | `test_status_led.cpp` | Blue through the boot wait, then green or red on the first `loop()` pass, with the e-stop released or held from power-up; no LED driven on gen1 (#46) |
+| `test_status_led_hold.cpp` | Amber while a command-watchdog trip or a latched heater fault holds the heaters off, red over amber while the e-stop is held, amber again on the release while the hold stays latched, and green once it is cleared; no LED driven on gen1 |
 
 ## Writing a test
 

@@ -59,6 +59,17 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Changed
 
+- **The status LED shows amber on a firmware hold** (gen2). While a
+  command-watchdog trip or a latched heater fault holds the heaters off, the
+  LED is amber (red 50, green 16) instead of green; red still wins while the
+  e-stop is held, and the LED returns to green once the trip and faults are
+  cleared. It takes the colour from `bsc::StatusLed::stateFor()`. Requires
+  bread-slice-core `^0.2.0` (`firmware/platformio.ini` and `slice.yaml`).
+  The e-stop input keeps the internal pull-up.
+  Host-tested only: the amber value is worked from the WS2812B datasheet and
+  has not been seen on a board. Gen2 flash grows by 40 B and RAM by 1 B;
+  gen1, which has no LED, by 2 B of flash and 1 B of RAM from the core's
+  e-stop input.
 - **The firmware README says which env fits a board** (#32). It links
   the generation-to-env map in `docs/hardware-revisions.md` and says to
   name the env when flashing, since a bare `pio run` builds `gen2_nano`.
