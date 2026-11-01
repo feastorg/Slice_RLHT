@@ -132,6 +132,10 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **Host tests rebuild after a library pin change** (#74). `pio pkg
+  install` keeps a release archive's mtimes, so a plain `make -C test/host`
+  kept linking objects built from the previous CRUMBS. A stamp of the
+  installed library versions now rebuilds them.
 - **GET_STATE no longer reports a torn temperature** (#25). The
   thermocouple readings were stored with interrupts enabled, four byte
   stores each, so a GET_STATE built mid-store could report a mix of the
