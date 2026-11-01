@@ -18,7 +18,7 @@ void printSliceState(Print &out)
     out.print(slice.relayHeater1.Kd);
 
     out.print(F(", Relay1Input:"));
-    out.print(slice.relayHeater1.inputTemperature);
+    out.print(selectedTemperature(slice.relayHeater1.thermocoupleSelect));
     out.print(F(", Setpoint1:"));
     out.print(slice.relayHeater1.setpointTemperature);
     out.print(F(", onTime1:"));
@@ -34,7 +34,7 @@ void printSliceState(Print &out)
     out.print(slice.relayHeater2.Kd);
 
     out.print(F(", Relay2Input:"));
-    out.print(slice.relayHeater2.inputTemperature);
+    out.print(selectedTemperature(slice.relayHeater2.thermocoupleSelect));
     out.print(F(", Setpoint2:"));
     out.print(slice.relayHeater2.setpointTemperature);
     out.print(F(", onTime2:"));

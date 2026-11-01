@@ -64,6 +64,10 @@ This project did not use formal release tags through most of its history, so thi
   name the env when flashing, since a bare `pio run` builds `gen2_nano`.
   The missing-`RLHT_HW_GEN` error points there too, and no longer
   suggests `gen2_nano`.
+- **The status line shows the selected reading** (#28). The serial
+  status line's `Relay1Input` and `Relay2Input` show the selected
+  thermocouple's reading in either mode. They showed the last
+  closed-loop input, which went stale in open loop.
 - **Command opcodes come from the handler table** (feastorg/CRUMBS#124).
   `on_message` refuses UNKNOWN_OP any opcode without a registered handler,
   asked of CRUMBS with `crumbs_has_handler()`, in place of the hand-kept
@@ -152,6 +156,15 @@ This project did not use formal release tags through most of its history, so thi
   zero for two computes. The PIDs now compute on each new reading, with
   the gains scaled to the 300 ms between readings. The integral per
   second and the proportional term are unchanged.
+- **A thermocouple select can't change under a running heater** (#54).
+  The PID stayed in automatic while its input moved to another sensor, so
+  the difference between the two read as a step in the measurement, and
+  the derivative kicked on it: with Kd 25.5 and sensors 100 °C apart, the
+  on-time jumped to the full 1000 ms period. SET_TC_SELECT now refuses
+  `WRONG_MODE` for a heater in closed loop with a setpoint, and serial
+  `R1TC=`/`R2TC=` ignore it, as for the other per-channel SETs; the other
+  channel still applies. With the setpoint at 0, or in open loop, the
+  select changes and the heater's PID restarts from 0 on the new sensor.
 - **SET_PID takes exactly 6 bytes** (#50). `rlht_set_pid_unpack` accepts
   trailing bytes, so a widened SET_PID, such as the u16 x1000 one
   bread-crumbs-contracts#64 proposes, was read as u8 x10 gains and applied.

@@ -209,9 +209,26 @@ static void processCommand(char *cmd)
         long value;
         if (bsc::parseLong(after_prefix_P(cmd, PSTR("R1TC=")), 1, 2, &value))
         {
-            slice.relayHeater1.thermocoupleSelect = (uint8_t)value;
-            Serial.print(F("R1 TC: "));
-            Serial.println((int)value);
+            // As handler_set_tc_select: not while heater 1 runs from its
+            // thermocouple. Checked and stored in one masked window.
+            noInterrupts();
+            const bool locked = (uint8_t)value != slice.relayHeater1.thermocoupleSelect &&
+                                thermocoupleSelectLocked(slice.relayHeater1);
+            if (!locked && (uint8_t)value != slice.relayHeater1.thermocoupleSelect)
+            {
+                slice.relayHeater1.thermocoupleSelect = (uint8_t)value;
+                tcSelectChanged1 = true;
+            }
+            interrupts();
+            if (locked)
+            {
+                Serial.println(F("Ignored: R1 heating in closed loop, set R1TEMP=0 first"));
+            }
+            else
+            {
+                Serial.print(F("R1 TC: "));
+                Serial.println((int)value);
+            }
         }
         else
         {
@@ -223,9 +240,26 @@ static void processCommand(char *cmd)
         long value;
         if (bsc::parseLong(after_prefix_P(cmd, PSTR("R2TC=")), 1, 2, &value))
         {
-            slice.relayHeater2.thermocoupleSelect = (uint8_t)value;
-            Serial.print(F("R2 TC: "));
-            Serial.println((int)value);
+            // As handler_set_tc_select: not while heater 2 runs from its
+            // thermocouple. Checked and stored in one masked window.
+            noInterrupts();
+            const bool locked = (uint8_t)value != slice.relayHeater2.thermocoupleSelect &&
+                                thermocoupleSelectLocked(slice.relayHeater2);
+            if (!locked && (uint8_t)value != slice.relayHeater2.thermocoupleSelect)
+            {
+                slice.relayHeater2.thermocoupleSelect = (uint8_t)value;
+                tcSelectChanged2 = true;
+            }
+            interrupts();
+            if (locked)
+            {
+                Serial.println(F("Ignored: R2 heating in closed loop, set R2TEMP=0 first"));
+            }
+            else
+            {
+                Serial.print(F("R2 TC: "));
+                Serial.println((int)value);
+            }
         }
         else
         {
