@@ -59,6 +59,11 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Changed
 
+- **The firmware README says which env fits a board** (#32). It links
+  the generation-to-env map in `docs/hardware-revisions.md` and says to
+  name the env when flashing, since a bare `pio run` builds `gen2_nano`.
+  The missing-`RLHT_HW_GEN` error points there too, and no longer
+  suggests `gen2_nano`.
 - **The status line shows the selected reading** (#28). The serial
   status line's `Relay1Input` and `Relay2Input` show the selected
   thermocouple's reading in either mode. They showed the last
@@ -136,6 +141,21 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **Host tests rebuild after a library pin change** (#74). `pio pkg
+  install` keeps a release archive's mtimes, so a plain `make -C test/host`
+  kept linking objects built from the previous CRUMBS. A stamp of the
+  installed library versions now rebuilds them.
+- **GET_STATE no longer reports a torn temperature** (#25). The
+  thermocouple readings were stored with interrupts enabled, four byte
+  stores each, so a GET_STATE built mid-store could report a mix of the
+  old and new value. Both readings are now taken first and stored in one
+  masked window.
+- **The heater PIDs compute once per thermocouple reading** (#53). PID_v1
+  computed every 100 ms, its default, on a reading refreshed every 300 ms,
+  so the derivative came as one impulse three times its size and then
+  zero for two computes. The PIDs now compute on each new reading, with
+  the gains scaled to the 300 ms between readings. The integral per
+  second and the proportional term are unchanged.
 - **A thermocouple select can't change under a running heater** (#54).
   The PID stayed in automatic while its input moved to another sensor, so
   the difference between the two read as a step in the measurement, and
