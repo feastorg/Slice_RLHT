@@ -12,7 +12,7 @@ which gen1 leaves unconnected, and GET_STATE reports relay 2 and a
 channel-2 on-time as if a second heater were there. A bare `pio run`
 builds `default_envs`, which is `gen2_nano`, so name the env when
 flashing: `pio run -e <env> -t upload`, for example `-e gen1_nano` for
-the bench rig's gen1 Nano.
+a gen1 Nano.
 
 ## Serial commands
 
