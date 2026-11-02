@@ -152,6 +152,16 @@ This project did not use formal release tags through most of its history, so thi
 
 ### Fixed
 
+- **GET_STATE replies are no longer cut short** (#81). `relayControlLogic()`
+  opened four masked windows on every loop pass, often enough to delay the
+  TWI interrupt in a slave clock stretch, so the controller saw a reply cut
+  to 0xFF partway. It now takes its snapshot, runs the PIDs and publishes
+  the on-times on a new thermocouple reading or once
+  `RLHT_SNAPSHOT_INTERVAL_MS` (default 10) has passed, and drives the relays
+  from that snapshot in between. The e-stop, watchdog and fault hold is
+  still checked on every pass, with no masked window. On the gen2 Nano, with
+  `replylog.py 19 1 300`: main 187 and 175 bad replies in 300 s, this build
+  1 in 2551. A command now waits up to the interval to reach a relay.
 - **Host tests rebuild after a library pin change** (#74). `pio pkg
   install` keeps a release archive's mtimes, so a plain `make -C test/host`
   kept linking objects built from the previous CRUMBS. A stamp of the

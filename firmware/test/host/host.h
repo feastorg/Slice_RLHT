@@ -11,6 +11,10 @@
 // passed, ends after about 1000 reads.
 extern unsigned long host_now;
 
+// How many times the firmware has called noInterrupts(): one per masked
+// window it opens. bread-slice-core's BSC_ATOMIC blocks are not counted.
+extern unsigned long host_masked_windows;
+
 // Level of the e-stop input (pin ESTOP). HIGH is released: the firmware uses
 // the internal pull-up and asserts on LOW.
 extern int host_estop_level;

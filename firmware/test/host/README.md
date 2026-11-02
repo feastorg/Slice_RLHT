@@ -10,7 +10,8 @@ and run on the host. Nothing is reimplemented:
   the last frame (`bsc_host_led_frame`) instead of sending it.
 - **Stubbed** (`stubs/`): the Arduino core, the AVR watchdog and the MAX6675
   driver. `digitalWrite()` records each pin's level (`host_pin_level`), so a
-  test reads the relays; the MAX6675 stub returns `host_tc1_celsius` and
+  test reads the relays; `noInterrupts()` counts its calls
+  (`host_masked_windows`); the MAX6675 stub returns `host_tc1_celsius` and
   `host_tc2_celsius`.
 
 Frames go in through `crumbs_peripheral_handle_receive()` and replies come
@@ -48,6 +49,7 @@ the board. `make` exits non-zero if any check fails.
 | `test_set_pid_length.cpp` | SET_PID takes 6 bytes (u8 x10) and 12 bytes (u16 x1000, up to 65.535, `RLHT_CAP_PID_X1000`); 5, 7, 11 and 13 bytes are refused `MALFORMED` and change no gain (#50, bread-crumbs-contracts#64) |
 | `test_status_led.cpp` | Blue through the boot wait, then green or red on the first `loop()` pass, with the e-stop released or held from power-up; no LED driven on gen1 (#46) |
 | `test_status_led_hold.cpp` | Amber while a command-watchdog trip or a latched heater fault holds the heaters off, red over amber while the e-stop is held, amber again on the release while the hold stays latched, and green once it is cleared; no LED driven on gen1 |
+| `test_mask_rate.cpp` | The loop opens a masked window only on a thermocouple reading or once `RLHT_SNAPSHOT_INTERVAL_MS` has passed, not on every pass (#81): counted over 3 s of closed-loop heating through a `noInterrupts()` that counts. A duty change still reaches relay 1 within the interval, and the e-stop drops it on the next pass |
 
 ## Writing a test
 
