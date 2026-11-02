@@ -98,6 +98,9 @@ static double pidSetpoint2 = 0.0;
 // so each reading gets one compute (feastorg/Slice_RLHT#53).
 static bool pidReadingPending1 = false;
 static bool pidReadingPending2 = false;
+// Set by each thermocouple reading and by the end of a hold, so the next
+// relayControlLogic() pass takes a snapshot whatever the interval.
+static bool snapshotDue = true;
 
 PID relay1PID(&pidInput1, &pidOutput1, &pidSetpoint1,
               slice.relayHeater1.Kp, slice.relayHeater1.Ki, slice.relayHeater1.Kd, DIRECT);
@@ -539,6 +542,7 @@ bool measureThermocouples()
         timing.lastThermoRead += THERMO_UPDATE_TIME_MS;
         pidReadingPending1 = true;
         pidReadingPending2 = true;
+        snapshotDue = true;
         return true;
     }
     return false;
@@ -684,19 +688,21 @@ void checkHeaterFaults()
         latchFaults(bits);
 }
 
-void relayControlLogic()
-{
-    // Apply any deferred relay period changes from ISR context.
-    applyPendingPeriods();
+// What actuateRelay() drives between snapshots: the on-times the last
+// snapshot settled on.
+static double drive1 = 0.0;
+static double drive2 = 0.0;
+static unsigned long lastSnapshotMs = 0;
 
-    // Snapshot ISR-written command fields atomically. Keep each masked
-    // window short (<~10 us): a long cli window delays TWI ISR entry at the
-    // SLA+R boundary and the resulting clock stretch is mishandled by Linux
-    // SBC I2C masters (see feastorg/Slice_DCMT#3). Per-heater fields stay in
-    // one window so a heater's tunings are never torn; a torn view across
-    // windows self-corrects next iteration.
+// Snapshot ISR-written command fields, run the PIDs and publish the on-times.
+// Keep each masked window short (<~10 us): a long cli window delays TWI ISR
+// entry at the SLA+R boundary and the resulting clock stretch is mishandled
+// by Linux SBC I2C masters (see feastorg/Slice_DCMT#3). Per-heater fields stay
+// in one window so a heater's tunings are never torn; a torn view across
+// windows self-corrects next snapshot.
+static void takeSnapshot()
+{
     noInterrupts();
-    bool localEStop = estopInput.asserted() || commandWatchdog.tripped() || heaterFaults != 0;
     ControlMode localMode = slice.mode;
     double sp1 = slice.relayHeater1.setpointTemperature;
     double sp2 = slice.relayHeater2.setpointTemperature;
@@ -742,24 +748,8 @@ void relayControlLogic()
     // and a write-back would overwrite a command that landed after the
     // snapshot (feastorg/Slice_RLHT#14).
 
-    // A tripped command watchdog or a latched fault holds the same safe state
-    // as e-stop until an explicit clear (CLEAR_WATCHDOG_TRIP or serial
-    // WDCLEAR; CLEAR_FAULTS or serial FAULTCLEAR).
-    if (localEStop)
-    {
-        relaysLow();
-        noInterrupts();
-        slice.relay1State = false;
-        slice.relay2State = false;
-        interrupts();
-        return;
-    }
-
     apply_mode_transition_if_needed(localMode);
     apply_tunings_if_needed(kp1, ki1, kd1, kp2, ki2, kd2);
-
-    double drive1;
-    double drive2;
 
     if (localMode == CLOSED_LOOP)
     {
@@ -767,6 +757,10 @@ void relayControlLogic()
 
 #if (RLHT_RELAY_COUNT >= 2)
         computeHeater(relay2PID, pidSetpoint2, pidInput2, pidOutput2, pidReadingPending2, sp2, selectedTemperature(tc2));
+#else
+        // Gen1 has no second heater: its snapshot fields go unused.
+        (void)sp2;
+        (void)tc2;
 #endif
 
         drive1 = pidOutput1;
@@ -793,23 +787,51 @@ void relayControlLogic()
     }
     else
     {
-        relaysLow();
-        noInterrupts();
-        slice.relay1State = false;
-        slice.relay2State = false;
-        interrupts();
+        // Drives of 0 hold both relays off until a valid mode arrives.
+        drive1 = 0.0;
+        drive2 = 0.0;
         SLICE_DEBUG_PRINTLN(F("ERROR INVALID MODE, ENTERED UNKNOWN STATE!"));
+    }
+}
+
+void relayControlLogic()
+{
+    // Apply any deferred relay period changes from ISR context.
+    applyPendingPeriods();
+
+    // A tripped command watchdog or a latched fault holds the same safe state
+    // as e-stop until an explicit clear (CLEAR_WATCHDOG_TRIP or serial
+    // WDCLEAR; CLEAR_FAULTS or serial FAULTCLEAR). Checked on every pass and
+    // with no masked window: each flag is one byte, read in one instruction,
+    // and only the main loop sets them.
+    if (estopInput.asserted() || commandWatchdog.tripped() || heaterFaults != 0)
+    {
+        relaysLow();
+        if (slice.relay1State || slice.relay2State)
+        {
+            noInterrupts();
+            slice.relay1State = false;
+            slice.relay2State = false;
+            interrupts();
+        }
+        // After the hold, the first pass drives from a fresh snapshot.
+        snapshotDue = true;
         return;
+    }
+
+    // The masked snapshot only on a new reading or once the interval has
+    // passed, not on every pass (feastorg/Slice_RLHT#81).
+    const unsigned long now = millis();
+    if (snapshotDue || now - lastSnapshotMs >= RLHT_SNAPSHOT_INTERVAL_MS)
+    {
+        snapshotDue = false;
+        lastSnapshotMs = now;
+        takeSnapshot();
     }
 
     actuateRelay(RELAY1, timing.relay1Start, (unsigned long)slice.relayHeater1.relayPeriod, (unsigned long)drive1, slice.relay1State);
 #if (RLHT_RELAY_COUNT >= 2)
     actuateRelay(RELAY2, timing.relay2Start, (unsigned long)slice.relayHeater2.relayPeriod, (unsigned long)drive2, slice.relay2State);
-#else
-    // Gen1 has no second heater: its snapshot fields go unused.
-    (void)sp2;
-    (void)tc2;
-    (void)drive2;
 #endif
 }
 

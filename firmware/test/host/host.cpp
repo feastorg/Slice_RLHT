@@ -14,7 +14,8 @@ float host_tc2_celsius = 25.0f;
 crumbs_context_t *host_ctx = nullptr;
 
 unsigned long millis() { return host_now; }
-void noInterrupts() {}
+unsigned long host_masked_windows = 0;
+void noInterrupts() { host_masked_windows++; }
 void interrupts() {}
 void pinMode(uint8_t, uint8_t) {}
 
