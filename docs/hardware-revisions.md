@@ -50,3 +50,27 @@ over the bus.
 
 Gen1 has no status LED either: D5 is unconnected, and the gen1 profile compiles
 the LED out (`RLHT_HAS_STATUS_LED`).
+
+## Gen1 thermocouple T-
+
+On gen1 the MAX6675's T- pin is not connected to ground. In all four gen1 board
+files, U3 pin 2 (`/T-1`) and U4 pin 2 (`/T-2`) reach only the filter capacitor,
+the ferrite bead and the thermocouple terminal (C3, FB2, J7; C6, FB4, J8). The
+MAX6675 datasheet's pin description for T- reads "Alumel Lead of Type-K
+Thermocouple. Should be connected to ground externally.", and under Open
+Thermocouple:
+
+> In order to allow the operation of the open thermocouple detector, T- must
+> be grounded. Make the ground connection as close to the GND pin as possible.
+
+The gen1 boards in use carry a hand rework for this: a solder bridge from pin 1
+(GND) to pin 2 (T-) on each MAX6675. A gen1 board without the bridge has a
+floating thermocouple input.
+
+Gen2 (`finn_recent`) grounds T- in the layout: U3 and U4 pin 2 are on GND. The
+current `hardware/` design uses MAX31855K converters, whose datasheet says the
+opposite for T- ("Thermocouple Input. See Table 1. Do not connect to GND."), and
+leaves it off GND.
+
+Gen1 thermocouples also read high as the board warms, by about 2 °C after
+hours powered (#86).
