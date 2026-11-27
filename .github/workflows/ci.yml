@@ -13,3 +13,5 @@ on:
 jobs:
   validate:
     uses: feastorg/bread-infra/.github/workflows/validate-manifest.yml@main
+    with:
+      schema_ref: schema-v2.0
